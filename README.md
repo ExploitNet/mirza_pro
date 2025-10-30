@@ -4,6 +4,10 @@
 
  ![GitHub Repo stars](https://img.shields.io/github/stars/ExploitNet/mirza_pro?style=flat&label=Stars%20%E2%AD%90)
 
+ اگر این پروژه برای شما مفید بوده،
+می‌توانید از طریق لینک زیر تیم میرزا را دونیت کنید:
+[حمایت از پروژه در NowPayments](https://nowpayments.io/donation/permiumbotmirza)
+
 ---
 #### لینک گروه موقت گزارش باگ : 
 https://t.me/+NABuHliyQrIzZGI0
