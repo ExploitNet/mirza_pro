@@ -509,7 +509,18 @@ if ($user['step'] == "createusertest" || preg_match('/locationtest_(.*)/', $data
         $textcreatuser = str_replace('{password}', $dataoutput['subscription_url'], $textcreatuser);
         update("invoice", "user_info", $dataoutput['subscription_url'], "id_invoice", $randomString);
     }
-    if ($marzban_list_get['sublink'] == "onsublink") {
+if ($marzban_list_get['sublink'] == "onsublink") {
+    if ($marzban_list_get['type'] == "WGDashboard") {
+        $urlimage = "{$marzban_list_get['inboundid']}_{$dataoutput['username']}.conf";
+        file_put_contents($urlimage, $output_config_link);
+        telegram('senddocument', [
+            'chat_id' => $from_id,
+            'document' => new CURLFile($urlimage),
+            'caption' => $textcreatuser,
+            'parse_mode' => "HTML",
+        ]);
+        unlink($urlimage);
+    } else {
         $urlimage = "$from_id$randomString.png";
         $qrCode = createqrcode($output_config_link);
         file_put_contents($urlimage, $qrCode->getString());
@@ -521,26 +532,21 @@ if ($user['step'] == "createusertest" || preg_match('/locationtest_(.*)/', $data
             'parse_mode' => "HTML",
         ]);
         unlink($urlimage);
-        if ($marzban_list_get['type'] == "WGDashboard") {
-            $urlimage = "{$marzban_list_get['inboundid']}_{$dataoutput['username']}.conf";
-            file_put_contents($urlimage, $output_config_link);
-            sendDocument($from_id, $urlimage, "⚙️ کانفیگ شما");
-            unlink($urlimage);
-        }
-    } elseif ($marzban_list_get['config'] == "onconfig") {
-        if (count($dataoutput['configs']) == 1) {
-            $urlimage = "$from_id$randomString.png";
-            $qrCode = createqrcode($config);
-            file_put_contents($urlimage, $qrCode->getString());
-            addBackgroundImage($urlimage, $qrCode, $Pathfiles . 'images.jpg');
-            telegram('sendphoto', [
-                'chat_id' => $from_id,
-                'photo' => new CURLFile($urlimage),
-                'caption' => $textcreatuser,
-                'parse_mode' => "HTML",
-            ]);
-            unlink($urlimage);
-        } else {
+    }
+} elseif ($marzban_list_get['config'] == "onconfig") {
+    if (count($dataoutput['configs']) == 1) {
+        $urlimage = "$from_id$randomString.png";
+        $qrCode = createqrcode($config);
+        file_put_contents($urlimage, $qrCode->getString());
+        addBackgroundImage($urlimage, $qrCode, $Pathfiles . 'images.jpg');
+        telegram('sendphoto', [
+            'chat_id' => $from_id,
+            'photo' => new CURLFile($urlimage),
+            'caption' => $textcreatuser,
+            'parse_mode' => "HTML",
+        ]);
+        unlink($urlimage);
+    } else {
             sendmessage($from_id, $textcreatuser, $usertestinfo, 'HTML');
         }
     } else {
@@ -1145,12 +1151,23 @@ if ($text == $text_bot_var['btn_keyboard']['buy'] && $setting['active_step_note'
     if ($marzban_list_get['type'] == "Manualsale" | $marzban_list_get['type'] == "ibsng") {
         sendmessage($from_id, $textcreatuser, null, 'HTML');
     } else {
-        if (count($dataoutput['configs']) != 1 and $marzban_list_get['config'] == "onconfig") {
-            sendmessage($from_id, $textcreatuser, null, 'HTML');
+    if (count($dataoutput['configs']) != 1 and $marzban_list_get['config'] == "onconfig") {
+        sendmessage($from_id, $textcreatuser, null, 'HTML');
+    } else {
+        if ($marzban_list_get['sublink'] == "offsublink") {
+            $output_config_link = $configqr;
+        }
+        if ($marzban_list_get['type'] == "WGDashboard") {
+            $urlimage = "{$marzban_list_get['inboundid']}_{$dataoutput['username']}.conf";
+            file_put_contents($urlimage, $output_config_link);
+            telegram('senddocument', [
+                'chat_id' => $from_id,
+                'document' => new CURLFile($urlimage),
+                'caption' => $textcreatuser,
+                'parse_mode' => "HTML",
+            ]);
+            unlink($urlimage);
         } else {
-            if ($marzban_list_get['sublink'] == "offsublink") {
-                $output_config_link = $configqr;
-            }
             $urlimage = "$from_id$randomString.png";
             $qrCode = createqrcode($output_config_link);
             file_put_contents($urlimage, $qrCode->getString());
@@ -1162,13 +1179,8 @@ if ($text == $text_bot_var['btn_keyboard']['buy'] && $setting['active_step_note'
                 'parse_mode' => "HTML",
             ]);
             unlink($urlimage);
-            if ($marzban_list_get['type'] == "WGDashboard") {
-                $urlimage = "{$marzban_list_get['inboundid']}_{$dataoutput['username']}.conf";
-                file_put_contents($urlimage, $output_config_link);
-                sendDocument($from_id, $urlimage, "⚙️ کانفیگ شما");
-                unlink($urlimage);
-            }
         }
+      }
     }
     sendmessage($from_id, $textbotlang['users']['selectoption'], $keyboard, 'HTML');
     if (intval($userbotbalance['pricediscount']) != 0) {
