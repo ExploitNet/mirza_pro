@@ -224,7 +224,9 @@ switch ($data['actions']) {
             } else {
                 if (isset($DataUserOut['online_at']) && $DataUserOut['online_at'] !== null) {
                     $dateString = $DataUserOut['online_at'];
-                    $lastonline = jdate('Y/m/d H:i:s', strtotime($dateString));
+                    $date = new DateTime($dateString, new DateTimeZone('UTC'));
+                    $date->setTimezone(new DateTimeZone('Asia/Tehran'));
+                    $lastonline = jdate('Y/m/d H:i:s', $date->getTimestamp());
                 } else {
                     $lastonline = "متصل نشده";
                 }
