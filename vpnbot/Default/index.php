@@ -443,7 +443,7 @@ if ($user['step'] == "createusertest" || preg_match('/locationtest_(.*)/', $data
     $stmt->execute();
     $stmt->close();
     $dataoutput = $ManagePanel->createUser($marzban_list_get['name_panel'], "usertest", $username_ac, $datac);
-    if (empty($dataoutput['username'])) {
+    if ($dataoutput['username'] == null) {
         $dataoutput['msg'] = json_encode($dataoutput['msg']);
         sendmessage($from_id, $textbotlang['users']['usertest']['errorcreat'], $keyboard, 'html');
         $texterros = "
@@ -509,7 +509,18 @@ if ($user['step'] == "createusertest" || preg_match('/locationtest_(.*)/', $data
         $textcreatuser = str_replace('{password}', $dataoutput['subscription_url'], $textcreatuser);
         update("invoice", "user_info", $dataoutput['subscription_url'], "id_invoice", $randomString);
     }
-    if ($marzban_list_get['sublink'] == "onsublink") {
+if ($marzban_list_get['sublink'] == "onsublink") {
+    if ($marzban_list_get['type'] == "WGDashboard") {
+        $urlimage = "{$marzban_list_get['inboundid']}_{$dataoutput['username']}.conf";
+        file_put_contents($urlimage, $output_config_link);
+        telegram('senddocument', [
+            'chat_id' => $from_id,
+            'document' => new CURLFile($urlimage),
+            'caption' => $textcreatuser,
+            'parse_mode' => "HTML",
+        ]);
+        unlink($urlimage);
+    } else {
         $urlimage = "$from_id$randomString.png";
         $qrCode = createqrcode($output_config_link);
         file_put_contents($urlimage, $qrCode->getString());
@@ -521,26 +532,21 @@ if ($user['step'] == "createusertest" || preg_match('/locationtest_(.*)/', $data
             'parse_mode' => "HTML",
         ]);
         unlink($urlimage);
-        if ($marzban_list_get['type'] == "WGDashboard") {
-            $urlimage = "{$marzban_list_get['inboundid']}_{$dataoutput['username']}.conf";
-            file_put_contents($urlimage, $output_config_link);
-            sendDocument($from_id, $urlimage, "⚙️ کانفیگ شما");
-            unlink($urlimage);
-        }
-    } elseif ($marzban_list_get['config'] == "onconfig") {
-        if (count($dataoutput['configs']) == 1) {
-            $urlimage = "$from_id$randomString.png";
-            $qrCode = createqrcode($config);
-            file_put_contents($urlimage, $qrCode->getString());
-            addBackgroundImage($urlimage, $qrCode, $Pathfiles . 'images.jpg');
-            telegram('sendphoto', [
-                'chat_id' => $from_id,
-                'photo' => new CURLFile($urlimage),
-                'caption' => $textcreatuser,
-                'parse_mode' => "HTML",
-            ]);
-            unlink($urlimage);
-        } else {
+    }
+} elseif ($marzban_list_get['config'] == "onconfig") {
+    if (count($dataoutput['configs']) == 1) {
+        $urlimage = "$from_id$randomString.png";
+        $qrCode = createqrcode($config);
+        file_put_contents($urlimage, $qrCode->getString());
+        addBackgroundImage($urlimage, $qrCode, $Pathfiles . 'images.jpg');
+        telegram('sendphoto', [
+            'chat_id' => $from_id,
+            'photo' => new CURLFile($urlimage),
+            'caption' => $textcreatuser,
+            'parse_mode' => "HTML",
+        ]);
+        unlink($urlimage);
+    } else {
             sendmessage($from_id, $textcreatuser, $usertestinfo, 'HTML');
         }
     } else {
@@ -846,16 +852,7 @@ if ($text == $text_bot_var['btn_keyboard']['buy'] && $setting['active_step_note'
             $code_product = $userdate['code_product'];
         }
     } else {
-        if (isset($dataget[1])) {
-            $code_product = $dataget[1];
-        } else {
-            $code_product = $userdate['code_product'] ?? null;
-        }
-    }
-    if (empty($code_product)) {
-        sendmessage($from_id, "❌ خطایی در هنگام خرید رخ داده لطفا مراحل را از اول طی کنید", $keyboard, 'html');
-        step("home", $from_id);
-        return;
+        $code_product = $dataget[1];
     }
     if (!in_array($user['step'], ["endstepuserscustom", "getvolumecustomuser"])) {
         $product = select("product", "*", "code_product", $code_product);
@@ -865,7 +862,7 @@ if ($text == $text_bot_var['btn_keyboard']['buy'] && $setting['active_step_note'
             return;
         }
         savedata("save", "code_product", $code_product);
-        $productlist = readJsonFileIfExists('product.json');
+        $productlist = json_decode(file_get_contents('product.json'), true);
         if (isset($productlist[$product['code_product']])) {
             $product['price_product'] = $productlist[$product['code_product']];
         }
@@ -950,7 +947,7 @@ if ($text == $text_bot_var['btn_keyboard']['buy'] && $setting['active_step_note'
         $product = $userdate['code_product'];
         $product = select("product", "*", "code_product", $product);
         $priceBot = $product['price_product'];
-        $productlist = readJsonFileIfExists('product.json');
+        $productlist = json_decode(file_get_contents('product.json'), true);
         if (isset($productlist[$product['code_product']])) {
             $product['price_product'] = $productlist[$product['code_product']];
         }
@@ -1057,7 +1054,7 @@ if ($text == $text_bot_var['btn_keyboard']['buy'] && $setting['active_step_note'
         'type' => 'buy_agent_user_bot'
     );
     $dataoutput = $ManagePanel->createUser($marzban_list_get['name_panel'], $datafactor['code_product'], $username_ac, $datac);
-    if (empty($dataoutput['username'])) {
+    if ($dataoutput['username'] == null) {
         $dataoutput['msg'] = json_encode($dataoutput['msg']);
         sendmessage($from_id, $textbotlang['users']['sell']['ErrorConfig'], $keyboard, 'HTML');
         $texterros = "⭕️ خطای ساخت اشتراک  در ربات نماینده
@@ -1154,12 +1151,23 @@ if ($text == $text_bot_var['btn_keyboard']['buy'] && $setting['active_step_note'
     if ($marzban_list_get['type'] == "Manualsale" | $marzban_list_get['type'] == "ibsng") {
         sendmessage($from_id, $textcreatuser, null, 'HTML');
     } else {
-        if (count($dataoutput['configs']) != 1 and $marzban_list_get['config'] == "onconfig") {
-            sendmessage($from_id, $textcreatuser, null, 'HTML');
+    if (count($dataoutput['configs']) != 1 and $marzban_list_get['config'] == "onconfig") {
+        sendmessage($from_id, $textcreatuser, null, 'HTML');
+    } else {
+        if ($marzban_list_get['sublink'] == "offsublink") {
+            $output_config_link = $configqr;
+        }
+        if ($marzban_list_get['type'] == "WGDashboard") {
+            $urlimage = "{$marzban_list_get['inboundid']}_{$dataoutput['username']}.conf";
+            file_put_contents($urlimage, $output_config_link);
+            telegram('senddocument', [
+                'chat_id' => $from_id,
+                'document' => new CURLFile($urlimage),
+                'caption' => $textcreatuser,
+                'parse_mode' => "HTML",
+            ]);
+            unlink($urlimage);
         } else {
-            if ($marzban_list_get['sublink'] == "offsublink") {
-                $output_config_link = $configqr;
-            }
             $urlimage = "$from_id$randomString.png";
             $qrCode = createqrcode($output_config_link);
             file_put_contents($urlimage, $qrCode->getString());
@@ -1171,13 +1179,8 @@ if ($text == $text_bot_var['btn_keyboard']['buy'] && $setting['active_step_note'
                 'parse_mode' => "HTML",
             ]);
             unlink($urlimage);
-            if ($marzban_list_get['type'] == "WGDashboard") {
-                $urlimage = "{$marzban_list_get['inboundid']}_{$dataoutput['username']}.conf";
-                file_put_contents($urlimage, $output_config_link);
-                sendDocument($from_id, $urlimage, "⚙️ کانفیگ شما");
-                unlink($urlimage);
-            }
         }
+      }
     }
     sendmessage($from_id, $textbotlang['users']['selectoption'], $keyboard, 'HTML');
     if (intval($userbotbalance['pricediscount']) != 0) {
@@ -1270,10 +1273,6 @@ $textonebuy
     step("getresidcart", $from_id);
     savedata("clear", "id_order", $randomString);
 } elseif ($user['step'] == "getresidcart") {
-    if (empty($photo)) {
-        sendmessage($from_id, "❌ لطفاً فقط تصویر رسید را ارسال کنید.", null, 'HTML');
-        return;
-    }
     $userdate = json_decode($user['Processing_value'], true);
     $PaymentReport = select("Payment_report", '*', "id_order", $userdate['id_order'], "select");
     $Confirm_pay = json_encode([
@@ -1662,7 +1661,7 @@ $output
         $product = $dataget[1];
         savedata("save", "code_product", $product);
         $product = select("product", "*", "code_product", $product);
-        $productlist = readJsonFileIfExists('product.json');
+        $productlist = json_decode(file_get_contents('product.json'), true);
         if (isset($productlist[$product['code_product']])) {
             $product['price_product'] = $productlist[$product['code_product']];
         }
@@ -1710,7 +1709,7 @@ $output
     if (isset($userdate['code_product'])) {
         $product = $userdate['code_product'];
         $product = select("product", "*", "code_product", $product);
-        $productlist = readJsonFileIfExists('product.json');
+        $productlist = json_decode(file_get_contents('product.json'), true);
         $priceproductmain = $product['price_product'];
         if (isset($productlist[$product['code_product']])) {
             $product['price_product'] = $productlist[$product['code_product']];
@@ -1738,7 +1737,7 @@ $output
             "data_limit_reset" => "no_reset"
         );
     }
-    $productlist_name = readJsonFileIfExists('product_name.json');
+    $productlist_name = json_decode(file_get_contents('product_name.json'), true);
     $datafactor['name_product'] = empty($productlist_name[$datafactor['code_product']]) ? $datafactor['name_product'] : $productlist_name[$datafactor['code_product']];
     $botbalance = select("botsaz", "*", "bot_token", $ApiToken, "select");
     $userbotbalance = select("user", "*", "id", $botbalance['id_user'], "select");
