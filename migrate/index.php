@@ -183,6 +183,45 @@ if(isset($uPOST['submit']) && $uPOST['submit']) {
             direction: rtl;
             text-align: right;
         }
+        .button-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-top: 20px;
+            align-items: center;
+        }
+        .submit-success {
+            display: inline-block;
+            background: #10b981;
+            color: white;
+            padding: 12px 30px;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: bold;
+            transition: background 0.3s;
+            text-align: center;
+        }
+        .submit-success:hover {
+            background: #059669;
+        }
+        .delete-button {
+            display: inline-block;
+            background: #ef4444;
+            color: white;
+            padding: 12px 30px;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: bold;
+            transition: background 0.3s;
+            text-align: center;
+            border: none;
+            cursor: pointer;
+            font-family: Vazir, sans-serif;
+            font-size: 16px;
+        }
+        .delete-button:hover {
+            background: #dc2626;
+        }
     </style>
 </head>
 <body>
@@ -225,26 +264,17 @@ if(isset($uPOST['submit']) && $uPOST['submit']) {
                 </div>
             <?php endif; ?>
          
-            <?php if (!empty($tgBot['details']['result']['username'])): ?>
-                <a class="submit-success" href="https://t.me/<?php echo $tgBot['details']['result']['username']; ?>">🤖 رفتن به ربات <?php echo "‎@".$tgBot['details']['result']['username']; ?> »</a>
-            <?php endif; ?>
-         
-            <div style="text-align: center; margin-top: 20px; font-size: 18px; color: #4ade80;">
-                <p>مهاجرت با موفقیت انجام شد! 🎉</p>
-                <p>پوشه‌های Installer و Migrate بعد از <span id="countdown">20</span> ثانیه به طور خودکار حذف خواهند شد.</p>
+            <div class="button-container">
+                <?php if (!empty($tgBot['details']['result']['username'])): ?>
+                    <a class="submit-success" href="https://t.me/<?php echo $tgBot['details']['result']['username']; ?>">🤖 رفتن به ربات <?php echo "‎@".$tgBot['details']['result']['username']; ?> »</a>
+                <?php endif; ?>
+             
+                <a class="delete-button" href="delete_migrate.php">🗑️ حذف پوشه‌های نصب و مهاجرت</a>
             </div>
-            <script>
-                let timeLeft = 20;
-                const countdownElement = document.getElementById('countdown');
-                const timer = setInterval(() => {
-                    timeLeft--;
-                    countdownElement.textContent = timeLeft;
-                    if (timeLeft <= 0) {
-                        clearInterval(timer);
-                        window.location.href = 'delete_migrate.php';
-                    }
-                }, 1000);
-            </script>
+         
+            <div style="text-align: center; margin-top: 20px; font-size: 16px; color: #6b7280;">
+                <p>برای امنیت بیشتر، پس از اتمام کار روی دکمه بالا کلیک کنید تا پوشه‌های Installer و Migrate حذف شوند.</p>
+            </div>
         <?php endif; ?>
          
         <form id="migrate-form" <?php if($success) { echo 'style="display:none;"'; } ?> method="post">
