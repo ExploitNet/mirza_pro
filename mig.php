@@ -17,26 +17,23 @@ function columnExists($table, $column) {
     return $result && $result->num_rows > 0;
 }
 
+function cannotHaveDefault($type) {
+    $type = strtolower($type);
+    return strpos($type, 'text') !== false ||
+           strpos($type, 'blob') !== false ||
+           strpos($type, 'json') !== false ||
+           strpos($type, 'geometry') !== false;
+}
+
 function safeAddColumn($table, $column, $type, $default = null, $after = null, $null = true) {
     global $connect;
-    
+   
     if (!columnExists($table, $column)) {
         $nullStr = $null ? 'NULL' : 'NOT NULL';
         $defaultStr = '';
         
 
-        $noDefaultTypes = ['TEXT', 'BLOB', 'JSON', 'GEOMETRY'];
-        $typeUpper = strtoupper($type);
-        $hasNoDefault = false;
-        
-        foreach ($noDefaultTypes as $noDefaultType) {
-            if (strpos($typeUpper, $noDefaultType) !== false) {
-                $hasNoDefault = true;
-                break;
-            }
-        }
-        
-        if ($default !== null && !$hasNoDefault) {
+        if ($default !== null && !cannotHaveDefault($type)) {
             if (is_numeric($default)) {
                 $defaultStr = "DEFAULT $default";
             } else {
@@ -49,13 +46,14 @@ function safeAddColumn($table, $column, $type, $default = null, $after = null, $
         
         if ($connect->query($sql)) {
             echo "فیلد $column به جدول $table اضافه شد ✅<br>";
-            
-            $isNumeric = (strpos($type, 'int') !== false) || 
-                        (strpos($type, 'decimal') !== false) || 
-                        (strpos($type, 'float') !== false) || 
+           
+
+            $isNumeric = (strpos($type, 'int') !== false) ||
+                        (strpos($type, 'decimal') !== false) ||
+                        (strpos($type, 'float') !== false) ||
                         (strpos($type, 'double') !== false) ||
                         (strpos($type, 'bool') !== false);
-            
+           
             if ($isNumeric && $default !== null) {
                 $connect->query("UPDATE IGNORE `$table` SET `$column` = $default WHERE `$column` IS NULL OR `$column` = ''");
             }
@@ -83,39 +81,28 @@ function safeDropColumn($table, $column) {
 
 function updateDefaultValue($table, $column, $value) {
     global $connect;
-    
+   
     if (!columnExists($table, $column)) {
         return;
     }
-    
+   
     $columnInfo = $connect->query("SHOW COLUMNS FROM `$table` WHERE Field = '$column'");
     if ($columnInfo && $col = $columnInfo->fetch_assoc()) {
         $type = $col['Type'];
         
 
-        $noDefaultTypes = ['text', 'blob', 'json', 'geometry'];
-        $typeLower = strtolower($type);
-        $hasNoDefault = false;
-        
-        foreach ($noDefaultTypes as $noDefaultType) {
-            if (strpos($typeLower, $noDefaultType) !== false) {
-                $hasNoDefault = true;
-                break;
-            }
-        }
-        
-        if ($hasNoDefault) {
+        if (cannotHaveDefault($type)) {
             return;
         }
         
-        $isNumeric = (strpos($type, 'int') !== false) || 
-                    (strpos($type, 'decimal') !== false) || 
-                    (strpos($type, 'float') !== false) || 
+        $isNumeric = (strpos($type, 'int') !== false) ||
+                    (strpos($type, 'decimal') !== false) ||
+                    (strpos($type, 'float') !== false) ||
                     (strpos($type, 'double') !== false) ||
                     (strpos($type, 'bool') !== false);
-        
+       
         $check = $connect->query("SELECT COUNT(*) as cnt FROM `$table` WHERE `$column` IS NULL OR `$column` = ''");
-        
+       
         if ($check && $check->fetch_assoc()['cnt'] > 0) {
             $setValue = '';
             if ($value === null) {
@@ -125,7 +112,7 @@ function updateDefaultValue($table, $column, $value) {
             } else {
                 $setValue = "'" . $connect->real_escape_string($value) . "'";
             }
-            
+           
             $connect->query("UPDATE IGNORE `$table` SET `$column` = $setValue WHERE `$column` IS NULL OR `$column` = ''");
             echo "مقدار پیش‌فرض '$value' برای فیلد $column به‌روزرسانی شد ✅<br>";
         }
@@ -136,13 +123,13 @@ function migrateTable($tableName, $targetStructure, $dropIfExists = false) {
     global $connect;
     $result = $connect->query("SHOW TABLES LIKE '$tableName'");
     $tableExists = ($result->num_rows > 0);
-
+    
     if ($dropIfExists && $tableExists) {
         $connect->query("DROP TABLE `$tableName`");
         echo "جدول $tableName حذف شد ✅<br>";
         $tableExists = false;
     }
-
+    
     if (!$tableExists) {
         $columns = [];
         foreach ($targetStructure as $col => $def) {
@@ -161,33 +148,21 @@ function migrateTable($tableName, $targetStructure, $dropIfExists = false) {
         while ($row = $showColumns->fetch_assoc()) {
             $existingColumns[] = $row['Field'];
         }
-
+        
         foreach ($existingColumns as $col) {
             if (!array_key_exists($col, $targetStructure)) {
                 safeDropColumn($tableName, $col);
             }
         }
-
+        
         foreach ($targetStructure as $col => $def) {
             if (!in_array($col, $existingColumns)) {
                 $defClean = trim($def);
                 $isNotNull = strpos($defClean, 'NOT NULL') !== false;
                 $null = !$isNotNull;
                 $default = null;
-                
-
-                $noDefaultTypes = ['TEXT', 'BLOB', 'JSON', 'GEOMETRY'];
-                $typeUpper = strtoupper($defClean);
-                $hasNoDefault = false;
-                
-                foreach ($noDefaultTypes as $noDefaultType) {
-                    if (strpos($typeUpper, $noDefaultType) !== false) {
-                        $hasNoDefault = true;
-                        break;
-                    }
-                }
-                
-                if (!$hasNoDefault && strpos($defClean, 'DEFAULT') !== false) {
+               
+                if (strpos($defClean, 'DEFAULT') !== false && !cannotHaveDefault($defClean)) {
                     if (preg_match("/DEFAULT\s+('([^']*)'|(\d+)|NULL)/i", $defClean, $matches)) {
                         if (isset($matches[3])) {
                             $default = (int)$matches[3];
@@ -198,7 +173,7 @@ function migrateTable($tableName, $targetStructure, $dropIfExists = false) {
                         }
                     }
                 }
-                
+               
                 $typeParts = explode(' ', $defClean);
                 $type = '';
                 $i = 0;
@@ -207,35 +182,21 @@ function migrateTable($tableName, $targetStructure, $dropIfExists = false) {
                     $i++;
                 }
                 $type = trim($type);
-                
+               
                 safeAddColumn($tableName, $col, $type, $default, null, $null);
             }
         }
-
+        
         foreach ($targetStructure as $col => $def) {
-            if (strpos($def, 'DEFAULT') !== false && columnExists($tableName, $col)) {
-
-                $noDefaultTypes = ['TEXT', 'BLOB', 'JSON', 'GEOMETRY'];
-                $typeUpper = strtoupper($def);
-                $hasNoDefault = false;
-                
-                foreach ($noDefaultTypes as $noDefaultType) {
-                    if (strpos($typeUpper, $noDefaultType) !== false) {
-                        $hasNoDefault = true;
-                        break;
+            if (strpos($def, 'DEFAULT') !== false && columnExists($tableName, $col) && !cannotHaveDefault($def)) {
+                if (preg_match("/DEFAULT\s+('([^']*)'|(\d+)|NULL)/i", $def, $matches)) {
+                    $defaultVal = null;
+                    if (isset($matches[3])) {
+                        $defaultVal = (int)$matches[3];
+                    } elseif (isset($matches[2])) {
+                        $defaultVal = $matches[2];
                     }
-                }
-                
-                if (!$hasNoDefault) {
-                    if (preg_match("/DEFAULT\s+('([^']*)'|(\d+)|NULL)/i", $def, $matches)) {
-                        $defaultVal = null;
-                        if (isset($matches[3])) {
-                            $defaultVal = (int)$matches[3];
-                        } elseif (isset($matches[2])) {
-                            $defaultVal = $matches[2];
-                        }
-                        updateDefaultValue($tableName, $col, $defaultVal);
-                    }
+                    updateDefaultValue($tableName, $col, $defaultVal);
                 }
             }
         }
@@ -245,7 +206,7 @@ function migrateTable($tableName, $targetStructure, $dropIfExists = false) {
 //-----------------------------------------------------------------
 
 try {
-    $connect->query("DROP TABLE IF EXISTS `setting_old`");
+    $connect->query("DROP TABLE IF EXISTS `setting`");
     echo "جدول setting قدیمی حذف شد ✅<br>";
 } catch (Exception $e) {
     logError($e->getMessage(), 'setting_old');
@@ -259,8 +220,46 @@ try {
     logError($e->getMessage(), 'marzban_panel');
 }
 
-//-----------------------------------------------------------------
 
+try {
+    safeDropColumn('user', 'ref_code');
+    echo "فیلد ref_code از جدول user حذف شد ✅<br>";
+} catch (Exception $e) {
+    logError($e->getMessage(), 'user');
+}
+
+try {
+    safeDropColumn('marzban_panel', 'statusTest');
+    safeDropColumn('marzban_panel', 'configManual');
+    safeDropColumn('marzban_panel', 'onholdstatus');
+    echo "فیلدهای قدیمی از جدول marzban_panel حذف شدند ✅<br>";
+} catch (Exception $e) {
+    logError($e->getMessage(), 'marzban_panel');
+}
+
+try {
+    safeDropColumn('product', 'Category');
+    echo "فیلد Category از جدول product حذف شد ✅<br>";
+} catch (Exception $e) {
+    logError($e->getMessage(), 'product');
+}
+
+try {
+    safeDropColumn('Payment_report', 'invoice');
+    echo "فیلد invoice از جدول Payment_report حذف شد ✅<br>";
+} catch (Exception $e) {
+    logError($e->getMessage(), 'Payment_report');
+}
+
+try {
+    safeDropColumn('affiliates', 'affiliatesstatus');
+    safeDropColumn('affiliates', 'affiliatespercentage');
+    echo "فیلدهای قدیمی از جدول affiliates حذف شدند ✅<br>";
+} catch (Exception $e) {
+    logError($e->getMessage(), 'affiliates');
+}
+
+//-----------------------------------------------------------------
 try {
     $tableName = 'user';
     $targetStructure = [
@@ -301,27 +300,27 @@ try {
         'expire' => 'VARCHAR(100) NULL',
         'token' => 'VARCHAR(100) NULL'
     ];
-    
+   
     migrateTable($tableName, $targetStructure);
-    
+   
     $result = $connect->query("SHOW TABLES LIKE '$tableName'");
     if ($result->num_rows > 0) {
         $numericColumns = [];
         $showColumns = $connect->query("SHOW COLUMNS FROM `user`");
         while ($row = $showColumns->fetch_assoc()) {
             $type = $row['Type'];
-            if (strpos($type, 'int') !== false || strpos($type, 'decimal') !== false || 
+            if (strpos($type, 'int') !== false || strpos($type, 'decimal') !== false ||
                 strpos($type, 'float') !== false || strpos($type, 'double') !== false ||
                 strpos($type, 'bool') !== false) {
                 $numericColumns[] = $row['Field'];
             }
         }
-        
+       
         foreach ($numericColumns as $col) {
             $connect->query("UPDATE IGNORE `user` SET `$col` = 0 WHERE `$col` = '' OR `$col` IS NULL");
         }
         echo "داده‌های عددی جدول user پاکسازی شد ✅<br>";
-        
+       
         $textNumericColumns = ['Balance', 'score', 'pagenumber', 'limit_usertest'];
         foreach ($textNumericColumns as $col) {
             if (columnExists('user', $col)) {
@@ -329,7 +328,7 @@ try {
             }
         }
     }
-    
+   
 } catch (Exception $e) {
     logError($e->getMessage(), 'user');
 }
@@ -349,6 +348,7 @@ try {
 } catch (Exception $e) {
     logError($e->getMessage(), 'help');
 }
+
 //-----------------------------------------------------------------
 try {
     $tableName = 'setting';
@@ -359,7 +359,7 @@ try {
         'test' => false, 'on_hold' => false, 'uptime_node' => false, 'uptime_panel' => false
     ));
     $keyboardmain = '{"keyboard":[[{"text":"text_sell"},{"text":"text_extend"}],[{"text":"text_usertest"},{"text":"text_wheel_luck"}],[{"text":"text_Purchased_services"},{"text":"accountwallet"}],[{"text":"text_affiliates"},{"text":"text_Tariff_list"}],[{"text":"text_support"},{"text":"text_help"}]]}';
-    
+   
 
     $targetStructure = [
         'Bot_Status' => "VARCHAR(200) NULL DEFAULT 'botstatuson'",
@@ -415,17 +415,17 @@ try {
         'cron_status' => "TEXT NOT NULL",
         'limitnumber' => "VARCHAR(200) NULL"
     ];
-    
+   
     migrateTable($tableName, $targetStructure, true);
-    
-
+   
     $insertSql = "INSERT INTO `$tableName` (Bot_Status,roll_Status,get_number,limit_usertest_all,iran_number,NotUser,affiliatesstatus,affiliatespercentage,removedayc,showcard,statuscategory,numbercount,statusnewuser,statusagentrequest,volumewarn,inlinebtnmain,verifystart,statussupportpv,statusnamecustom,statuscategorygenral,agentreqprice,cronvolumere,bulkbuy,on_hold_day,verifybucodeuser,scorestatus,Lottery_prize,wheelـluck,wheelـluck_price,iplogin,daywarn,categoryhelp,linkappstatus,languageen,languageru,wheelagent,Lotteryagent,statusfirstwheel,statuslimitchangeloc,limitnumber,Debtsettlement,Dice,keyboardmain,statusnoteforf,statuscopycart,timeauto_not_verify,status_keyboard_config,cron_status) VALUES ('botstatuson','rolleon','onAuthenticationphone','1','offAuthenticationiran','offnotuser','offaffiliates','0','1','1','offcategory','0','onnewuser','onrequestagent','2','offinline','offverify','offpvsupport','offnamecustom','offcategorys','0','5','onbulk','4','offverify','0','$DATAAWARD','0','0','0','2','0','0','0','0','1','1','0','0','$limitlist','1','0','$keyboardmain','1','0','4','1','$status_cron')";
     $connect->query($insertSql);
     echo "داده‌های پیش‌فرض به جدول setting اضافه شد ✅<br>";
-    
+   
 } catch (Exception $e) {
     logError($e->getMessage(), 'setting');
 }
+
 //-----------------------------------------------------------------
 try {
     $tableName = 'admin';
@@ -445,6 +445,7 @@ try {
 } catch (Exception $e) {
     logError($e->getMessage(), 'admin');
 }
+
 //-----------------------------------------------------------------
 try {
     $tableName = 'channels';
@@ -457,6 +458,7 @@ try {
 } catch (Exception $e) {
     logError($e->getMessage(), 'channels');
 }
+
 //--------------------------------------------------------------
 try {
     $tableName = 'marzban_panel';
@@ -465,8 +467,6 @@ try {
     $valuemain = json_encode(array('f' => "1", 'n' => "1", 'n2' => "1"));
     $valuemax = json_encode(array('f' => "1000", 'n' => "1000", 'n2' => "1000"));
     $valuemax_time = json_encode(array('f' => "365", 'n' => "365", 'n2' => "365"));
-    
-
     $targetStructure = [
         'id' => 'INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY',
         'code_panel' => 'VARCHAR(200) NULL',
@@ -494,14 +494,14 @@ try {
         'val_usertest' => 'VARCHAR(100) NULL DEFAULT \'100\'',
         'secret_code' => 'VARCHAR(200) NULL',
         'priceChangeloc' => 'VARCHAR(200) NULL DEFAULT \'0\'',
-        'priceextravolume' => "VARCHAR(500) NULL DEFAULT '$valueprice'",
-        'pricecustomvolume' => "VARCHAR(500) NULL DEFAULT '$valueprice'",
-        'pricecustomtime' => "VARCHAR(500) NULL DEFAULT '$valueprice'",
-        'priceextratime' => "VARCHAR(500) NULL DEFAULT '$valueprice'",
-        'mainvolume' => "VARCHAR(500) NULL DEFAULT '$valuemain'",
-        'maxvolume' => "VARCHAR(500) NULL DEFAULT '$valuemax'",
-        'maintime' => "VARCHAR(500) NULL DEFAULT '$valuemain'",
-        'maxtime' => "VARCHAR(500) NULL DEFAULT '$valuemax_time'",
+        'priceextravolume' => "VARCHAR(500) NULL",
+        'pricecustomvolume' => "VARCHAR(500) NULL",
+        'pricecustomtime' => "VARCHAR(500) NULL",
+        'priceextratime' => "VARCHAR(500) NULL",
+        'mainvolume' => "VARCHAR(500) NULL",
+        'maxvolume' => "VARCHAR(500) NULL",
+        'maintime' => "VARCHAR(500) NULL",
+        'maxtime' => "VARCHAR(500) NULL",
         'status_extend' => 'VARCHAR(100) NULL DEFAULT \'on_extend\'',
         'datelogin' => 'TEXT NULL',
         'proxies' => 'TEXT NULL',
@@ -515,6 +515,14 @@ try {
     migrateTable($tableName, $targetStructure);
     
 
+    $connect->query("UPDATE marzban_panel SET priceextravolume = '$valueprice' WHERE priceextravolume IS NULL OR priceextravolume = ''");
+    $connect->query("UPDATE marzban_panel SET pricecustomvolume = '$valueprice' WHERE pricecustomvolume IS NULL OR pricecustomvolume = ''");
+    $connect->query("UPDATE marzban_panel SET pricecustomtime = '$valueprice' WHERE pricecustomtime IS NULL OR pricecustomtime = ''");
+    $connect->query("UPDATE marzban_panel SET priceextratime = '$valueprice' WHERE priceextratime IS NULL OR priceextratime = ''");
+    $connect->query("UPDATE marzban_panel SET mainvolume = '$valuemain' WHERE mainvolume IS NULL OR mainvolume = ''");
+    $connect->query("UPDATE marzban_panel SET maxvolume = '$valuemax' WHERE maxvolume IS NULL OR maxvolume = ''");
+    $connect->query("UPDATE marzban_panel SET maintime = '$valuemain' WHERE maintime IS NULL OR maintime = ''");
+    $connect->query("UPDATE marzban_panel SET maxtime = '$valuemax_time' WHERE maxtime IS NULL OR maxtime = ''");
     $connect->query("UPDATE marzban_panel SET customvolume = '$VALUE' WHERE customvolume IS NULL OR customvolume = ''");
     
 
@@ -530,11 +538,10 @@ try {
 } catch (Exception $e) {
     logError($e->getMessage(), 'marzban_panel');
 }
+
 //-----------------------------------------------------------------
 try {
     $tableName = 'product';
-    
-
     $targetStructure = [
         'id' => 'INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY',
         'code_product' => 'VARCHAR(200) NULL',
@@ -550,12 +557,18 @@ try {
         'inbounds' => 'TEXT NULL',
         'proxies' => 'TEXT NULL',
         'category' => 'VARCHAR(400) NULL',
-        'hide_panel' => 'TEXT NOT NULL DEFAULT \'{}\''
+        'hide_panel' => 'TEXT NOT NULL'
     ];
     migrateTable($tableName, $targetStructure);
+    
+
+    $connect->query("UPDATE product SET hide_panel = '{}' WHERE hide_panel IS NULL OR hide_panel = ''");
+    $connect->query("UPDATE product SET note = '' WHERE note IS NULL");
+    
 } catch (Exception $e) {
     logError($e->getMessage(), 'product');
 }
+
 //-----------------------------------------------------------------
 try {
     $tableName = 'invoice';
@@ -579,13 +592,12 @@ try {
         'Status' => 'VARCHAR(200) NULL'
     ];
     migrateTable($tableName, $targetStructure);
-    
-
     $data = json_encode(array('volume' => false, 'time' => false));
     $connect->query("UPDATE invoice SET notifctions = '$data' WHERE notifctions IS NULL OR notifctions = ''");
 } catch (Exception $e) {
     logError($e->getMessage(), 'invoice');
 }
+
 //-----------------------------------------------------------------
 try {
     $tableName = 'Payment_report';
@@ -608,6 +620,7 @@ try {
 } catch (Exception $e) {
     logError($e->getMessage(), 'Payment_report');
 }
+
 //-----------------------------------------------------------------
 try {
     $tableName = 'Discount';
@@ -622,6 +635,7 @@ try {
 } catch (Exception $e) {
     logError($e->getMessage(), 'Discount');
 }
+
 //-----------------------------------------------------------------
 try {
     $tableName = 'Giftcodeconsumed';
@@ -634,11 +648,12 @@ try {
 } catch (Exception $e) {
     logError($e->getMessage(), 'Giftcodeconsumed');
 }
+
 //-----------------------------------------------------------------
 try {
     $tableName = 'textbot';
     $text_roll = "♨️ قوانین استفاده از خدمات ما\n1- به اطلاعیه هایی که داخل کانال گذاشته می شود حتما توجه کنید.\n2- در صورتی که اطلاعیه ای در مورد قطعی در کانال گذاشته نشده به اکانت پشتیبانی پیام دهید\n3- سرویس ها را از طریق پیامک ارسال نکنید برای ارسال پیامک می توانید از طریق ایمیل ارسال کنید.";
-    $text_dec_fq = " 💡 سوالات متداول ⁉️\n1️⃣ فیلترشکن شما آیپی ثابته؟ میتونم برای صرافی های ارز دیجیتال استفاده کنم？\n✅ به دلیل وضعیت نت و محدودیت های کشور سرویس ما مناسب ترید نیست و فقط لوکیشن‌ ثابته.\n2️⃣ اگه قبل از منقضی شدن اکانت، تمدیدش کنم روزهای باقی مانده می سوزد？\n✅ خیر، روزهای باقیمونده اکانت موقع تمدید حساب میشن و اگه مثلا 5 روز قبل از منقضی شدن اکانت 1 ماهه خودتون اون رو تمدید کنید 5 روز باقیمونده + 30 روز تمدید میشه.\n3️⃣ اگه به یک اکانت بیشتر از حد مجاز متصل شیم چه اتفاقی میافته？\n✅ در این صورت حجم سرویس شما زود تمام خواهد شد.\n4️⃣ فیلترشکن شما از چه نوعیه？\n✅ فیلترشکن های ما v2ray است و پروتکل‌های مختلفی رو ساپورت میکنیم تا حتی تو دورانی که اینترنت اختلال داره بدون مشکل و افت سرعت بتونید از سرویستون استفاده کنید.\n5️⃣ فیلترشکن از کدوم کشور است？\n✅ سرور فیلترشکن ما از کشور آلمان است\n6️⃣ چطور باید از این فیلترشکن استفاده کنم？\n✅ برای آموزش استفاده از برنامه، روی دکمه «📚 آموزش» بزنید.\n7️⃣ فیلترشکن وصل نمیشه، چیکار کنم؟\n✅ به همراه یک عکس از پیغام خطایی که میگیرید به پشتیبانی مراجعه کنید.\n8️⃣ فیلترشکن شما تضمینی هست که همیشه مواقع متصل بشه؟\n✅ به دلیل قابل پیش‌بینی نبودن وضعیت نت کشور، امکان دادن تضمین نیست فقط می‌تونیم تضمین کنیم که تمام تلاشمون رو برای ارائه سرویس هر چه بهتر انجام بدیم.\n9️⃣ امکان بازگشت وجه دارید؟\n✅ امکان بازگشت وجه در صورت حل نشدن مشکل از سمت ما وجود دارد.\n💡 در صورتی که جواب سوالتون رو نگرفتید میتونید به «پشتیبانی» مراجعه کنید.";
+    $text_dec_fq = " 💡 سوالات متداول ⁉️\n1️⃣ فیلترشکن شما آیپی ثابته؟ میتونم برای صرافی های ارز دیجیتال استفاده کنم？\n✅ به دلیل وضعیت نت و محدودیت های کشور سرویس ما مناسب ترید نیست و فقط لوکیشن‌ ثابته.\n2️⃣ اگه قبل از منقضی شدن اکانت، تمدیدش کنم روزهای باقی مانده می سوزد？\n✅ خیر، روزهای باقیمونده اکانت موقع تمدید حساب میشن و اگه مثلا 5 روز قبل از منقضی شدن اکانت 1 ماهه خودتون اون رو تمدید کنید 5 روز باقیمونده + 30 روز تمدید میشه.\n3️⃣ اگه به یک اکانت بیشتر از حد مجاز متصل شیم چه اتفاقی میافته？\n✅ در این صورت حجم سرویس شما زود تمام خواهد شد.\n4️⃣ فیلترشکن شما از چه نوعیه？\n✅ فیلترشکن های ما v2ray است و پروتکل‌های مختلفی رو ساپورت میکنیم تا حتی تو دورانی که اینترنت اختلال داره بدون مشکل و افت سرعت بتونید از سرویستون استفاده کنید.\n5️⃣ فیلترشکن از کدوم کشور است？\n✅ سرور فیلترشکن ما از کشور آلمان است\n6️⃣ چطور باید از این فیلترشکن استفاده کنم？\n✅ برای آموزش استفاده از برنامه، روی دکمه «📚 آموزش» بزنید.\n7️⃣ فیلترشکن وصل نمیشه، چیکار کنم？\n✅ به همراه یک عکس از پیغام خطایی که میگیرید به پشتیبانی مراجعه کنید.\n8️⃣ فیلترشکن شما تضمینی هست که همیشه مواقع متصل بشه？\n✅ به دلیل قابل پیش‌بینی نبودن وضعیت نت کشور، امکان دادن تضمین نیست فقط می‌تونیم تضمین کنیم که تمام تلاشمون رو برای ارائه سرویس هر چه بهتر انجام بدیم.\n9️⃣ امکان بازگشت وجه دارید？\n✅ امکان بازگشت وجه در صورت حل نشدن مشکل از سمت ما وجود دارد.\n💡 در صورتی که جواب سوالتون رو نگرفتید میتونید به «پشتیبانی» مراجعه کنید.";
     $text_channel = "⚠️ کاربر گرامی؛ شما عضو چنل ما نیستید\nاز طریق دکمه زیر وارد کانال شده و عضو شوید\nپس از عضویت دکمه بررسی عضویت را کلیک کنید";
     $text_invoice = "📇 پیش فاکتور شما:\n👤 نام کاربری: {username}\n🔐 نام سرویس: {name_product}\n📆 مدت اعتبار: {Service_time} روز\n💶 قیمت: {price} تومان\n👥 حجم اکانت: {Volume} گیگ\n🗒 یادداشت محصول : {note}\n💵 موجودی کیف پول شما : {userBalance}\n \n💰 سفارش شما آماده پرداخت است";
     $textafterpay = "✅ سرویس با موفقیت ایجاد شد\n\n👤 نام کاربری سرویس : {username}\n🌿 نام سرویس: {name_service}\n‏🇺🇳 لوکیشن: {location}\n⏳ مدت زمان: {day} روز\n🗜 حجم سرویس: {volume} گیگابایت\n\nلینک اتصال:\n{config}\n{links}\n🧑‍🦯 شما میتوانید شیوه اتصال را با فشردن دکمه زیر و انتخاب سیستم عامل خود را دریافت کنید";
@@ -654,7 +669,6 @@ try {
         'text' => 'TEXT NOT NULL'
     ];
     migrateTable($tableName, $targetStructure);
-
     $insertQueries = [
         ['text_start', 'سلام خوش آمدید'],
         ['text_usertest', '🔑 اکانت تست'],
@@ -800,6 +814,7 @@ try {
 } catch (Exception $e) {
     logError($e->getMessage(), 'PaySetting');
 }
+
 //----------------------- [ Discount ] --------------------- //
 try {
     $tableName = 'DiscountSell';
@@ -821,6 +836,7 @@ try {
 } catch (Exception $e) {
     logError($e->getMessage(), 'DiscountSell');
 }
+
 //-----------------------------------------------------------------
 try {
     $tableName = 'affiliates';
@@ -840,7 +856,8 @@ try {
 } catch (Exception $e) {
     logError($e->getMessage(), 'affiliates');
 }
-// برای shopSetting
+
+
 try {
     $tableName = 'shopSetting';
     $agent_cashback = json_encode(array('n' => 0, 'n2' => 0));
@@ -874,7 +891,8 @@ try {
 } catch (Exception $e) {
     logError($e->getMessage(), 'shopSetting');
 }
-//----------------------- [ remove requests ] --------------------- //
+
+
 try {
     $tableName = 'cancel_service';
     $targetStructure = [
@@ -888,6 +906,7 @@ try {
 } catch (Exception $e) {
     logError($e->getMessage(), 'cancel_service');
 }
+
 try {
     $tableName = 'service_other';
     $targetStructure = [
@@ -913,11 +932,11 @@ try {
         'namecard' => 'VARCHAR(1000) NOT NULL'
     ];
     migrateTable($tableName, $targetStructure);
-
     $connect->query("ALTER TABLE card_number CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
 } catch (Exception $e) {
     logError($e->getMessage(), 'card_number');
 }
+
 try {
     $tableName = 'Requestagent';
     $targetStructure = [
@@ -932,10 +951,9 @@ try {
 } catch (Exception $e) {
     logError($e->getMessage(), 'Requestagent');
 }
+
 try {
     $tableName = 'topicid';
-    
-
     $targetStructure = [
         'report' => 'VARCHAR(500) PRIMARY KEY NOT NULL',
         'idreport' => 'TEXT NOT NULL'
@@ -959,6 +977,7 @@ try {
 } catch (Exception $e) {
     logError($e->getMessage(), 'topicid');
 }
+
 try {
     $tableName = 'manualsell';
     $targetStructure = [
@@ -974,6 +993,7 @@ try {
 } catch (Exception $e) {
     logError($e->getMessage(), 'manualsell');
 }
+
 //-----------------------------------------------------------------
 try {
     $tableName = 'departman';
@@ -990,10 +1010,9 @@ try {
 } catch (Exception $e) {
     logError($e->getMessage(), 'departman');
 }
+
 try {
     $tableName = 'support_message';
-    
-
     $targetStructure = [
         'id' => 'INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY',
         'Tracking' => 'VARCHAR(100) NOT NULL',
@@ -1006,9 +1025,11 @@ try {
         'status' => "ENUM('Answered','Pending','Unseen','Customerresponse','close') NOT NULL DEFAULT 'Pending'"
     ];
     migrateTable($tableName, $targetStructure);
+    $connect->query("UPDATE support_message SET result = '0' WHERE result IS NULL");
 } catch (Exception $e) {
     logError($e->getMessage(), 'support_message');
 }
+
 try {
     $tableName = 'wheel_list';
     $targetStructure = [
@@ -1023,10 +1044,9 @@ try {
 } catch (Exception $e) {
     logError($e->getMessage(), 'wheel_list');
 }
+
 try {
     $tableName = 'botsaz';
-    
-
     $targetStructure = [
         'id' => 'INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY',
         'id_user' => 'VARCHAR(200) NOT NULL',
@@ -1038,9 +1058,11 @@ try {
         'time' => 'VARCHAR(200) NOT NULL'
     ];
     migrateTable($tableName, $targetStructure);
+    $connect->query("UPDATE botsaz SET hide_panel = '{}' WHERE hide_panel IS NULL OR hide_panel = ''");
 } catch (Exception $e) {
     logError($e->getMessage(), 'botsaz');
 }
+
 try {
     $tableName = 'app';
     $targetStructure = [
@@ -1052,6 +1074,7 @@ try {
 } catch (Exception $e) {
     logError($e->getMessage(), 'app');
 }
+
 try {
     $tableName = 'logs_api';
     $targetStructure = [
@@ -1066,6 +1089,7 @@ try {
 } catch (Exception $e) {
     logError($e->getMessage(), 'logs_api');
 }
+
 //----------------------- [ Category ] --------------------- //
 try {
     $tableName = 'category';
@@ -1077,6 +1101,7 @@ try {
 } catch (Exception $e) {
     logError($e->getMessage(), 'category');
 }
+
 try {
     $tableName = 'reagent_report';
     $targetStructure = [
