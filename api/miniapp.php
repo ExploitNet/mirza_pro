@@ -121,11 +121,43 @@ switch ($data['actions']) {
                 } else {
                     $expire = $DataUserOut['expire'] ? jdate('Y/m/d', $DataUserOut['expire']) : 'نامحدود';
                 }
+                $data_limit_bytes = is_numeric($DataUserOut['data_limit']) ? (float)$DataUserOut['data_limit'] : 0;
+                $used_traffic_bytes = is_numeric($DataUserOut['used_traffic']) ? (float)$DataUserOut['used_traffic'] : 0;
+                $data_limit = $data_limit_bytes / pow(1024, 3);
+                $used_Traffic = $used_traffic_bytes / pow(1024, 3);
+
+                if (($DataUserOut['online_at'] ?? null) == "online") {
+                    $lastonline = 'آنلاین';
+                } elseif (($DataUserOut['online_at'] ?? null) == "offline") {
+                    $lastonline = 'آفلاین';
+                } else {
+                    if (isset($DataUserOut['online_at']) && $DataUserOut['online_at'] !== null) {
+                        $dateString = $DataUserOut['online_at'];
+                        $date = new DateTime($dateString, new DateTimeZone('UTC'));
+                        $date->setTimezone(new DateTimeZone('Asia/Tehran'));
+                        
+
+                        $now = new DateTime('now', new DateTimeZone('Asia/Tehran'));
+                        $diff = $now->getTimestamp() - $date->getTimestamp();
+                        
+                        if ($diff <= 10) { // ده ثانیه
+                            $lastonline = 'آنلاین';
+                        } else {
+                            $lastonline = 'آفلاین';
+                        }
+                    } else {
+                        $lastonline = "آفلاین";
+                    }
+                }
+
                 $datauser[] = [
                     'username' => $invoice['username'],
                     'status' => $DataUserOut['status'],
                     'expire' => $expire,
-                    'note' => $invoice['note']
+                    'online_status' => $lastonline,
+                    'note' => $invoice['note'],
+                    'total_traffic_gb' => round($data_limit, 2),
+                    'used_traffic_gb' => round($used_Traffic, 2)
                 ];
             }
         }
