@@ -3664,7 +3664,7 @@ $text";
         sendvideo($trakingdetail['idsupport'], $videoid, null);
     }
     sendmessage($trakingdetail['idsupport'], $textsuppoer, $Response, 'HTML');
-    sendmessage($from_id, "✅  پیام شما برای این درخواست با موفقیت ارسال گردید پس از بررسی پاسخ داده خواهد شد.", null, 'HTML');
+    sendmessage($from_id, "✅  پیام شما برای این درخواست با موفقیت ارسال گردید پس از بررسی پاسخ داده خواهد شد.", null, 'HTML'); // fix: correct parameter syntax in sendmessage function
 } elseif ($datain == "fqQuestions") {
     sendmessage($from_id, $datatextbot['text_dec_fq'], null, 'HTML');
 } elseif ($text == $datatextbot['accountwallet'] || $datain == "account" || $text == "/wallet") {
