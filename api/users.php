@@ -1,8 +1,8 @@
 <?php
 
-require_once '../config.php';
-require_once '../function.php';
-require_once '../botapi.php';
+require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../function.php';
+require_once __DIR__ . '/../botapi.php';
 
 // Set headers and configuration
 header('Content-Type: application/json; charset=UTF-8');
@@ -679,12 +679,12 @@ switch ($data['actions'] ?? '') {
         ));
         $destination = dirname(getcwd());
         $dirsource = "$destination/vpnbot/{$data['chat_id']}{$getInfoToken['result']['username']}";
-        if (is_dir($dirsource)) {
-            shell_exec("rm -rf $dirsource");
+        if (is_dir($dirsource) && !deleteDirectory($dirsource)) {
+            error_log('Failed to remove existing bot directory: ' . $dirsource);
         }
-        mkdir($dirsource);
-        $command = "cp -r $destination/vpnbot/Default/* $dirsource 2>&1";
-        shell_exec($command);
+        if (!copyDirectoryContents($destination . '/vpnbot/Default', $dirsource)) {
+            error_log('Failed to copy default bot files into: ' . $dirsource);
+        }
         $contentconfig = file_get_contents($dirsource . "/config.php");
         $new_code = str_replace('BotTokenNew', $data['token'], $contentconfig);
         file_put_contents($dirsource . "/config.php", $new_code);
@@ -723,8 +723,12 @@ switch ($data['actions'] ?? '') {
             sendJsonResponse(false, "User does not have an active bot.", [], 200);
         $destination = dirname(getcwd());
         $dirsource = "$destination/vpnbot/{$data['chat_id']}{$contentbot['username']}";
-        shell_exec("rm -rf $dirsource");
-        file_get_contents("https://api.telegram.org/bot{$contentbot['bot_toekn']}/deletewebhook");
+        if (is_dir($dirsource) && !deleteDirectory($dirsource)) {
+            error_log('Failed to remove bot directory: ' . $dirsource);
+        }
+        if (!empty($contentbot['bot_token'])) {
+            file_get_contents("https://api.telegram.org/bot{$contentbot['bot_token']}/deletewebhook");
+        }
         $stmt = $pdo->prepare("DELETE FROM botsaz WHERE id_user = :id_user");
         $stmt->bindParam(':id_user', $data['chat_id'], PDO::PARAM_STR);
         $stmt->execute();

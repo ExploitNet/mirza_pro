@@ -12,39 +12,440 @@ use Endroid\QrCode\Label\LabelAlignment;
 use Endroid\QrCode\RoundBlockSizeMode;
 use Endroid\QrCode\Writer\PngWriter;
 
+#-----------shell helper utilities------------#
+function isShellExecAvailable()
+{
+    static $isAvailable;
+
+    if ($isAvailable !== null) {
+        return $isAvailable;
+    }
+
+    if (!function_exists('shell_exec')) {
+        $isAvailable = false;
+        return $isAvailable;
+    }
+
+    $disabledFunctions = ini_get('disable_functions');
+    if (!empty($disabledFunctions) && stripos($disabledFunctions, 'shell_exec') !== false) {
+        $isAvailable = false;
+        return $isAvailable;
+    }
+
+    $isAvailable = true;
+    return $isAvailable;
+}
+
+function getCrontabBinary()
+{
+    static $resolvedPath;
+
+    if ($resolvedPath !== null) {
+        return $resolvedPath ?: null;
+    }
+
+    $candidateDirectories = [
+        '/usr/local/bin',
+        '/usr/bin',
+        '/bin',
+        '/usr/sbin',
+        '/sbin',
+    ];
+
+    $environmentPath = getenv('PATH');
+    if ($environmentPath !== false && $environmentPath !== '') {
+        foreach (explode(PATH_SEPARATOR, $environmentPath) as $pathDirectory) {
+            $pathDirectory = trim($pathDirectory);
+            if ($pathDirectory !== '' && !in_array($pathDirectory, $candidateDirectories, true)) {
+                $candidateDirectories[] = $pathDirectory;
+            }
+        }
+    }
+
+    foreach ($candidateDirectories as $directory) {
+        $executablePath = rtrim($directory, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'crontab';
+        if (@is_file($executablePath) && @is_executable($executablePath)) {
+            $resolvedPath = $executablePath;
+            return $resolvedPath;
+        }
+    }
+
+    if (isShellExecAvailable()) {
+        $whichOutput = @shell_exec('command -v crontab 2>/dev/null');
+        if (is_string($whichOutput)) {
+            $whichOutput = trim($whichOutput);
+            if ($whichOutput !== '' && @is_executable($whichOutput)) {
+                $resolvedPath = $whichOutput;
+                return $resolvedPath;
+            }
+        }
+    }
+
+    $resolvedPath = '';
+    error_log('Unable to locate the crontab executable on this system.');
+
+    return null;
+}
+
+function runShellCommand($command)
+{
+    if (!isShellExecAvailable()) {
+        error_log('shell_exec is not available; unable to run command: ' . $command);
+        return null;
+    }
+
+    if (getenv('PATH') === false || trim((string) getenv('PATH')) === '') {
+        putenv('PATH=/usr/local/bin:/usr/bin:/bin');
+    }
+
+    return shell_exec($command);
+}
+
+function deleteDirectory($directory)
+{
+    if (!file_exists($directory)) {
+        return true;
+    }
+
+    if (!is_dir($directory)) {
+        return @unlink($directory);
+    }
+
+    $items = scandir($directory);
+    if ($items === false) {
+        return false;
+    }
+
+    foreach ($items as $item) {
+        if ($item === '.' || $item === '..') {
+            continue;
+        }
+
+        $path = $directory . DIRECTORY_SEPARATOR . $item;
+        if (is_dir($path)) {
+            if (!deleteDirectory($path)) {
+                return false;
+            }
+        } else {
+            if (!@unlink($path)) {
+                return false;
+            }
+        }
+    }
+
+    return @rmdir($directory);
+}
+
+function ensureTableUtf8mb4($table)
+{
+    global $pdo;
+
+    try {
+        $stmt = $pdo->prepare('SELECT TABLE_COLLATION FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?');
+        $stmt->execute([$table]);
+        $currentCollation = $stmt->fetchColumn();
+
+        if ($currentCollation === false) {
+            error_log("Failed to detect current collation for table {$table}");
+            return false;
+        }
+
+        if (stripos((string) $currentCollation, 'utf8mb4') === 0) {
+            return true;
+        }
+
+        $pdo->exec("ALTER TABLE `{$table}` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+        return true;
+    } catch (PDOException $e) {
+        error_log('Failed to convert table to utf8mb4: ' . $e->getMessage());
+        return false;
+    }
+}
+
+function ensureCardNumberTableSupportsUnicode()
+{
+    global $connect;
+
+    if (!isset($connect) || !($connect instanceof mysqli)) {
+        return;
+    }
+
+    try {
+        if (method_exists($connect, 'character_set_name') && $connect->character_set_name() !== 'utf8mb4') {
+            if (!$connect->set_charset('utf8mb4')) {
+                error_log('Failed to enforce utf8mb4 charset on mysqli connection: ' . $connect->error);
+            }
+        }
+
+        if (!$connect->query("SET NAMES 'utf8mb4' COLLATE 'utf8mb4_unicode_ci'")) {
+            error_log('Failed to execute SET NAMES utf8mb4 for card_number table: ' . $connect->error);
+        }
+
+        $createQuery = "CREATE TABLE IF NOT EXISTS card_number (" .
+            "cardnumber varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci PRIMARY KEY," .
+            "namecard varchar(1000) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL" .
+            ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+        if (!$connect->query($createQuery)) {
+            error_log('Failed to create card_number table with utf8mb4 charset: ' . $connect->error);
+        }
+
+        ensureTableUtf8mb4('card_number');
+
+        $columnInfo = $connect->query("SHOW FULL COLUMNS FROM card_number WHERE Field IN ('cardnumber', 'namecard')");
+        if ($columnInfo instanceof mysqli_result) {
+            while ($column = $columnInfo->fetch_assoc()) {
+                $collation = $column['Collation'] ?? '';
+                if (!is_string($collation) || stripos($collation, 'utf8mb4') === false) {
+                    $field = $column['Field'];
+                    $type = $field === 'cardnumber' ? 'varchar(500)' : 'varchar(1000)';
+                    $alter = sprintf(
+                        "ALTER TABLE card_number MODIFY %s %s CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci%s",
+                        $field,
+                        $type,
+                        $field === 'cardnumber' ? ' PRIMARY KEY' : ' NOT NULL'
+                    );
+                    if (!$connect->query($alter)) {
+                        error_log('Failed to update card_number column collation: ' . $connect->error);
+                    }
+                }
+            }
+            $columnInfo->free();
+        } else {
+            error_log('Unable to inspect card_number column collations: ' . $connect->error);
+        }
+    } catch (\Throwable $e) {
+        error_log('Unexpected error while ensuring card_number utf8mb4 compatibility: ' . $e->getMessage());
+    }
+}
+
+function normaliseUpdateValue($value)
+{
+    if (is_array($value) || is_object($value)) {
+        return json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
+
+    return $value;
+}
+
+function copyDirectoryContents($source, $destination)
+{
+    if (!is_dir($source)) {
+        return false;
+    }
+
+    if (!is_dir($destination) && !mkdir($destination, 0777, true) && !is_dir($destination)) {
+        return false;
+    }
+
+    $items = scandir($source);
+    if ($items === false) {
+        return false;
+    }
+
+    foreach ($items as $item) {
+        if ($item === '.' || $item === '..') {
+            continue;
+        }
+
+        $sourcePath = $source . DIRECTORY_SEPARATOR . $item;
+        $destinationPath = $destination . DIRECTORY_SEPARATOR . $item;
+
+        if (is_dir($sourcePath)) {
+            if (!copyDirectoryContents($sourcePath, $destinationPath)) {
+                return false;
+            }
+        } else {
+            if (!@copy($sourcePath, $destinationPath)) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
 #-----------function------------#
 function step($step, $from_id)
 {
     global $pdo;
     $stmt = $pdo->prepare('UPDATE user SET step = ? WHERE id = ?');
     $stmt->execute([$step, $from_id]);
+    clearSelectCache('user');
+}
+function determineColumnTypeFromValue($value)
+{
+    if (is_bool($value)) {
+        return 'TINYINT(1)';
+    }
+
+    if (is_int($value)) {
+        return 'INT(11)';
+    }
+
+    if (is_float($value)) {
+        return 'DOUBLE';
+    }
+
+    if ($value === null) {
+        return 'VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci';
+    }
+
+    if (is_string($value)) {
+        if (function_exists('mb_strlen')) {
+            $length = mb_strlen($value, 'UTF-8');
+        } else {
+            $length = strlen($value);
+        }
+
+        if ($length <= 191) {
+            return 'VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci';
+        }
+
+        if ($length <= 500) {
+            return 'VARCHAR(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci';
+        }
+
+        return 'TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci';
+    }
+
+    return 'TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci';
+}
+function ensureColumnExistsForUpdate($tableName, $fieldName, $valueSample = null)
+{
+    global $pdo;
+
+    try {
+        $stmt = $pdo->prepare('SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?');
+        $stmt->execute([$tableName, $fieldName]);
+        if ((int) $stmt->fetchColumn() > 0) {
+            return;
+        }
+
+        $datatype = determineColumnTypeFromValue($valueSample);
+
+        $defaultValue = null;
+        if (is_bool($valueSample)) {
+            $defaultValue = $valueSample ? '1' : '0';
+        } elseif (is_scalar($valueSample) && $valueSample !== null) {
+            $defaultValue = (string) $valueSample;
+        }
+
+        addFieldToTable($tableName, $fieldName, $defaultValue, $datatype);
+    } catch (PDOException $e) {
+        error_log('Failed to ensure column exists: ' . $e->getMessage());
+    }
 }
 function update($table, $field, $newValue, $whereField = null, $whereValue = null)
 {
     global $pdo, $user;
 
-    if ($whereField !== null) {
-        $stmt = $pdo->prepare("SELECT $field FROM $table WHERE $whereField = ? FOR UPDATE");
-        $stmt->execute([$whereValue]);
-        $currentValue = $stmt->fetchColumn();
-        $stmt = $pdo->prepare("UPDATE $table SET $field = ? WHERE $whereField = ?");
-        $stmt->execute([$newValue, $whereValue]);
-    } else {
-        $stmt = $pdo->prepare("UPDATE $table SET $field = ?");
-        $stmt->execute([$newValue]);
+    $valueToStore = normaliseUpdateValue($newValue);
+
+    ensureColumnExistsForUpdate($table, $field, $valueToStore);
+
+    $executeUpdate = function ($value) use ($pdo, $table, $field, $whereField, $whereValue) {
+        if ($whereField !== null) {
+            $stmt = $pdo->prepare("SELECT $field FROM $table WHERE $whereField = ? FOR UPDATE");
+            $stmt->execute([$whereValue]);
+            $stmt = $pdo->prepare("UPDATE $table SET $field = ? WHERE $whereField = ?");
+            $stmt->execute([$value, $whereValue]);
+        } else {
+            $stmt = $pdo->prepare("UPDATE $table SET $field = ?");
+            $stmt->execute([$value]);
+        }
+    };
+
+    try {
+        $executeUpdate($valueToStore);
+    } catch (PDOException $e) {
+        if (strpos($e->getMessage(), 'Incorrect string value') !== false) {
+            $tableConverted = ensureTableUtf8mb4($table);
+            if ($tableConverted) {
+                try {
+                    $executeUpdate($valueToStore);
+                } catch (PDOException $retryException) {
+                    error_log('Retry after charset conversion failed: ' . $retryException->getMessage());
+                    throw $retryException;
+                }
+            } else {
+                $fallbackValue = is_string($valueToStore) ? @iconv('UTF-8', 'UTF-8//IGNORE', $valueToStore) : $valueToStore;
+                if ($fallbackValue === false) {
+                    $fallbackValue = '';
+                }
+                $executeUpdate($fallbackValue);
+            }
+        } else {
+            throw $e;
+        }
     }
+
     $date = date("Y-m-d H:i:s");
     if (!isset($user['step'])) {
         $user['step'] = '';
     }
-    $logss = "{$table}_{$field}_{$newValue}_{$whereField}_{$whereValue}_{$user['step']}_$date";
+    $logValue = is_scalar($valueToStore) ? $valueToStore : json_encode($valueToStore, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    $logss = "{$table}_{$field}_{$logValue}_{$whereField}_{$whereValue}_{$user['step']}_$date";
     if ($field != "message_count" || $field != "last_message_time") {
         file_put_contents('log.txt', "\n" . $logss, FILE_APPEND);
     }
+
+    clearSelectCache($table);
 }
-function select($table, $field, $whereField = null, $whereValue = null, $type = "select")
+function &getSelectCacheStore()
+{
+    static $store = [
+        'results' => [],
+        'tableIndex' => [],
+    ];
+
+    return $store;
+}
+
+function clearSelectCache($table = null)
+{
+    $store =& getSelectCacheStore();
+
+    if ($table === null) {
+        $store['results'] = [];
+        $store['tableIndex'] = [];
+        return;
+    }
+
+    if (!isset($store['tableIndex'][$table])) {
+        return;
+    }
+
+    foreach (array_keys($store['tableIndex'][$table]) as $cacheKey) {
+        unset($store['results'][$cacheKey]);
+    }
+
+    unset($store['tableIndex'][$table]);
+}
+
+function select($table, $field, $whereField = null, $whereValue = null, $type = "select", $options = [])
 {
     global $pdo;
+
+    $useCache = true;
+    if (is_array($options) && array_key_exists('cache', $options)) {
+        $useCache = (bool) $options['cache'];
+    }
+
+    $cacheKey = null;
+    if ($useCache) {
+        $cacheKey = hash('sha256', json_encode([
+            $table,
+            $field,
+            $whereField,
+            $whereValue,
+            $type,
+        ], JSON_UNESCAPED_UNICODE));
+
+        $store =& getSelectCacheStore();
+        if (isset($store['results'][$cacheKey])) {
+            return $store['results'][$cacheKey];
+        }
+    }
 
     $query = "SELECT $field FROM $table";
 
@@ -53,7 +454,6 @@ function select($table, $field, $whereField = null, $whereValue = null, $type = 
     }
 
     try {
-
         $stmt = $pdo->prepare($query);
         if ($whereField !== null) {
             $stmt->bindParam(':whereValue', $whereValue, PDO::PARAM_STR);
@@ -61,18 +461,55 @@ function select($table, $field, $whereField = null, $whereValue = null, $type = 
 
         $stmt->execute();
         if ($type == "count") {
-            return $stmt->rowCount();
+            $result = $stmt->rowCount();
         } elseif ($type == "FETCH_COLUMN") {
-            return $stmt->fetchAll(PDO::FETCH_COLUMN);
+            $results = $stmt->fetchAll(PDO::FETCH_COLUMN);
+            if ($table === 'admin' && $field === 'id_admin') {
+                global $adminnumber;
+                if (!is_array($results)) {
+                    $results = [];
+                }
+
+                $results = array_values(array_unique(array_filter($results, function ($value) {
+                    return $value !== null && $value !== '';
+                })));
+
+                if (empty($results) && isset($adminnumber) && $adminnumber !== '') {
+                    $results[] = (string) $adminnumber;
+                }
+            }
+            $result = $results;
         } elseif ($type == "fetchAll") {
-            return $stmt->fetchAll();
+            $result = $stmt->fetchAll();
         } else {
-            return $stmt->fetch(PDO::FETCH_ASSOC);
+            $fetched = $stmt->fetch(PDO::FETCH_ASSOC);
+            $result = $fetched === false ? null : $fetched;
         }
     } catch (PDOException $e) {
         error_log($e->getMessage());
         die("Query failed: " . $e->getMessage());
     }
+
+    if ($useCache && $cacheKey !== null) {
+        $store =& getSelectCacheStore();
+        $store['results'][$cacheKey] = $result;
+        if (!isset($store['tableIndex'][$table])) {
+            $store['tableIndex'][$table] = [];
+        }
+        $store['tableIndex'][$table][$cacheKey] = true;
+    }
+
+    return $result;
+}
+
+function getPaySettingValue($name, $default = null)
+{
+    $result = select("PaySetting", "ValuePay", "NamePay", $name, "select");
+    if (!is_array($result) || !array_key_exists('ValuePay', $result)) {
+        return $default;
+    }
+
+    return $result['ValuePay'];
 }
 function generateUUID()
 {
@@ -86,9 +523,107 @@ function generateUUID()
 }
 function tronratee()
 {
-    $file = file_get_contents('https://api.com/b.php', true);
-    $file = json_decode($file, true);
-    return $file;
+    $context = stream_context_create([
+        'http' => [
+            'timeout' => 5,
+        ],
+    ]);
+
+    $url = 'https://bapi.officialvpn.shop/arz/mirza_arz.php';
+    $response = @file_get_contents($url, false, $context);
+
+    if ($response === false) {
+        error_log('Failed to fetch currency rates from CoinGecko');
+        return ['ok' => false, 'result' => []];
+    }
+
+    $data = json_decode($response, true);
+    if (!is_array($data)) {
+        error_log('Invalid response received from CoinGecko');
+        return ['ok' => false, 'result' => []];
+    }
+
+    $extractRate = static function (?array $assetData, string $symbol) {
+        if (!is_array($assetData) || empty($assetData)) {
+            error_log('Missing or invalid rate for ' . $symbol . ' from CoinGecko');
+            return null;
+        }
+
+        $irr = $assetData['irr'] ?? null;
+        if (is_numeric($irr) && (float)$irr > 0.0) {
+            return (float)$irr;
+        }
+
+        $irt = $assetData['irt'] ?? null;
+        if (is_numeric($irt) && (float)$irt > 0.0) {
+            return (float)$irt * 10.0;
+        }
+
+        error_log('Missing or invalid rate for ' . $symbol . ' from CoinGecko');
+        return null;
+    };
+
+    $requiredRates = [
+        'TRX' => $extractRate($data['tron'] ?? null, 'TRX'),
+        'Ton' => $extractRate($data['toncoin'] ?? null, 'Ton'),
+        'USD' => $extractRate($data['tether'] ?? null, 'USD'),
+    ];
+
+    foreach ($requiredRates as $value) {
+        if ($value === null) {
+            return ['ok' => false, 'result' => []];
+        }
+    }
+
+    $toToman = static function ($rialValue) {
+        return round($rialValue / 10, 2);
+    };
+
+    $result = [
+        'TRX' => $toToman($requiredRates['TRX']),
+        'Ton' => $toToman($requiredRates['Ton']),
+        'USD' => $toToman($requiredRates['USD']),
+    ];
+
+    return ['ok' => true, 'result' => $result];
+}
+
+function requireTronRates(array $keys = [])
+{
+    $rates = tronratee();
+    if (empty($rates['ok'])) {
+        return null;
+    }
+
+    $result = $rates['result'];
+    foreach ($keys as $key) {
+        if (!isset($result[$key]) || (is_numeric($result[$key]) && (float)$result[$key] == 0.0)) {
+            return null;
+        }
+    }
+
+    return $result;
+}
+
+function updatePaymentMessageId($response, $orderId)
+{
+    if (!is_array($response)) {
+        error_log("Failed to send payment message for order {$orderId}: unexpected response");
+        return false;
+    }
+
+    if (empty($response['ok'])) {
+        error_log("Failed to send payment message for order {$orderId}: " . json_encode($response));
+        return false;
+    }
+
+    if (!isset($response['result']['message_id'])) {
+        error_log("Missing message_id for order {$orderId}: " . json_encode($response));
+        return false;
+    }
+
+    update("Payment_report", "message_id", intval($response['result']['message_id']), "id_order", $orderId);
+    return true;
 }
 function nowPayments($payment, $price_amount, $order_id, $order_description)
 {
@@ -1059,52 +1594,136 @@ function addBackgroundImage($urlimage, $qrCodeResult, $backgroundPath)
 }
 function checktelegramip()
 {
-    $telegram_ip_ranges = [
+    $clientIp = $_SERVER['REMOTE_ADDR'] ?? '';
+    if (!is_string($clientIp) || $clientIp === '') {
+        return false;
+    }
+
+    $clientIp = trim($clientIp);
+    if (!filter_var($clientIp, FILTER_VALIDATE_IP)) {
+        return false;
+    }
+
+    $telegramIpRanges = [
         ['lower' => '149.154.160.0', 'upper' => '149.154.175.255'],
-        ['lower' => '91.108.4.0', 'upper' => '91.108.7.255']
+        ['lower' => '91.108.4.0', 'upper' => '91.108.7.255'],
+        ['lower' => '2001:67c:4e8::', 'upper' => '2001:67c:4e8:ffff:ffff:ffff:ffff:ffff']
     ];
-    $ip_dec = (float) sprintf("%u", ip2long($_SERVER['REMOTE_ADDR']));
-    $ok = false;
-    foreach ($telegram_ip_ranges as $telegram_ip_range)
-        if (!$ok) {
-            $lower_dec = (float) sprintf("%u", ip2long($telegram_ip_range['lower']));
-            $upper_dec = (float) sprintf("%u", ip2long($telegram_ip_range['upper']));
-            if ($ip_dec >= $lower_dec and $ip_dec <= $upper_dec)
-                $ok = true;
+
+    foreach ($telegramIpRanges as $range) {
+        if (isClientIpInRange($clientIp, $range['lower'], $range['upper'])) {
+            return true;
         }
-    return $ok;
+    }
+
+    return false;
+}
+
+function isClientIpInRange($clientIp, $lowerBound, $upperBound)
+{
+    $clientPacked = inet_pton($clientIp);
+    $lowerPacked = inet_pton($lowerBound);
+    $upperPacked = inet_pton($upperBound);
+
+    if ($clientPacked === false || $lowerPacked === false || $upperPacked === false) {
+        return false;
+    }
+
+    $length = strlen($clientPacked);
+    if ($length !== strlen($lowerPacked) || $length !== strlen($upperPacked)) {
+        return false;
+    }
+
+    return strcmp($clientPacked, $lowerPacked) >= 0 && strcmp($clientPacked, $upperPacked) <= 0;
 }
 function addCronIfNotExists($cronCommand)
 {
-    $existingCron = shell_exec('crontab -l');
-    if (strpos($existingCron, $cronCommand) === false) {
-        $newCron = $existingCron . "\n" . $cronCommand . "\n";
-        file_put_contents('/tmp/mycron', $newCron);
-        shell_exec('crontab /tmp/mycron');
-        unlink('/tmp/mycron');
+    $commands = is_array($cronCommand) ? $cronCommand : [$cronCommand];
+    $commands = array_values(array_filter(array_map('trim', $commands), static function ($command) {
+        return $command !== '';
+    }));
+
+    if (empty($commands)) {
+        return true;
     }
+
+    $logContext = implode('; ', $commands);
+
+    if (!isShellExecAvailable()) {
+        error_log('shell_exec is not available; unable to register cron job(s): ' . $logContext);
+        return false;
+    }
+
+    $crontabBinary = getCrontabBinary();
+    if ($crontabBinary === null) {
+        error_log('crontab executable not found; unable to register cron job(s): ' . $logContext);
+        return false;
+    }
+
+    $existingCronJobs = runShellCommand(sprintf('%s -l 2>/dev/null', escapeshellarg($crontabBinary)));
+    $existingCronJobs = trim((string) $existingCronJobs);
+    $cronLines = $existingCronJobs === '' ? [] : preg_split('/\r?\n/', $existingCronJobs);
+    $cronLines = array_values(array_filter(array_map('trim', $cronLines), static function ($line) {
+        return $line !== '' && strpos($line, '#') !== 0;
+    }));
+
+    $newLineAdded = false;
+    foreach ($commands as $command) {
+        if (!in_array($command, $cronLines, true)) {
+            $cronLines[] = $command;
+            $newLineAdded = true;
+        }
+    }
+
+    if (!$newLineAdded) {
+        return true;
+    }
+
+    $cronLines = array_values(array_unique($cronLines));
+    $cronContent = implode(PHP_EOL, $cronLines) . PHP_EOL;
+
+    $temporaryFile = tempnam(sys_get_temp_dir(), 'cron');
+    if ($temporaryFile === false) {
+        error_log('Unable to create temporary file for cron job registration.');
+        return false;
+    }
+
+    if (file_put_contents($temporaryFile, $cronContent) === false) {
+        error_log('Unable to write cron configuration to temporary file: ' . $temporaryFile);
+        unlink($temporaryFile);
+        return false;
+    }
+
+    runShellCommand(sprintf('%s %s', escapeshellarg($crontabBinary), escapeshellarg($temporaryFile)));
+    unlink($temporaryFile);
+
+    return true;
 }
 
 function activecron()
 {
     global $domainhosts;
 
-    addCronIfNotExists("*/15 * * * * curl https://$domainhosts/cronbot/statusday.php");
-    addCronIfNotExists("*/1 * * * * curl https://$domainhosts/cronbot/croncard.php");
-    addCronIfNotExists("*/1 * * * * curl https://$domainhosts/cronbot/NoticationsService.php");
-    addCronIfNotExists("*/5 * * * * curl https://$domainhosts/cronbot/payment_expire.php");
-    addCronIfNotExists("*/1 * * * * curl https://$domainhosts/cronbot/sendmessage.php");
-    addCronIfNotExists("*/3 * * * * curl https://$domainhosts/cronbot/plisio.php");
-    addCronIfNotExists("*/1 * * * * curl https://$domainhosts/cronbot/activeconfig.php");
-    addCronIfNotExists("*/1 * * * * curl https://$domainhosts/cronbot/disableconfig.php");
-    addCronIfNotExists("*/1 * * * * curl https://$domainhosts/cronbot/iranpay1.php");
-    addCronIfNotExists("0 */5 * * * curl https://$domainhosts/cronbot/backupbot.php");
-    addCronIfNotExists("*/2 * * * * curl https://$domainhosts/cronbot/gift.php");
-    addCronIfNotExists("*/30 * * * * curl https://$domainhosts/cronbot/expireagent.php");
-    addCronIfNotExists("*/15 * * * * curl https://$domainhosts/cronbot/onc_hold.php");
-    addCronIfNotExists("*/2 * * * * curl https://$domainhosts/cronbot/configtest.php");
-    addCronIfNotExists("*/15 * * * * curl https://$domainhosts/cronbot/uptime_node.php");
-    addCronIfNotExists("*/15 * * * * curl https://$domainhosts/cronbot/uptime_panel.php");
+    $cronCommands = [
+        "*/15 * * * * curl https://$domainhosts/cronbot/statusday.php",
+        "*/1 * * * * curl https://$domainhosts/cronbot/croncard.php",
+        "*/1 * * * * curl https://$domainhosts/cronbot/NoticationsService.php",
+        "*/5 * * * * curl https://$domainhosts/cronbot/payment_expire.php",
+        "*/1 * * * * curl https://$domainhosts/cronbot/sendmessage.php",
+        "*/3 * * * * curl https://$domainhosts/cronbot/plisio.php",
+        "*/1 * * * * curl https://$domainhosts/cronbot/activeconfig.php",
+        "*/1 * * * * curl https://$domainhosts/cronbot/disableconfig.php",
+        "*/1 * * * * curl https://$domainhosts/cronbot/iranpay1.php",
+        "0 */5 * * * curl https://$domainhosts/cronbot/backupbot.php",
+        "*/2 * * * * curl https://$domainhosts/cronbot/gift.php",
+        "*/30 * * * * curl https://$domainhosts/cronbot/expireagent.php",
+        "*/15 * * * * curl https://$domainhosts/cronbot/on_hold.php",
+        "*/2 * * * * curl https://$domainhosts/cronbot/configtest.php",
+        "*/15 * * * * curl https://$domainhosts/cronbot/uptime_node.php",
+        "*/15 * * * * curl https://$domainhosts/cronbot/uptime_panel.php",
+    ];
+
+    addCronIfNotExists($cronCommands);
 }
 
 function inlineFixer($str, int $count_button = 1)
@@ -1434,22 +2053,29 @@ function sendMessageService($panel_info, $config, $sub_link, $username_service, 
         $out_put_qrcode = $config[0];
     }
     if ($STATUS_SEND_MESSAGE_PHOTO) {
-        $urlimage = "$user_id$invoice_id.png";
-        $qrCode = createqrcode($out_put_qrcode);
-        file_put_contents($urlimage, $qrCode->getString());
-        addBackgroundImage($urlimage, $qrCode, $image);
-        telegram('sendphoto', [
-            'chat_id' => $user_id,
-            'photo' => new CURLFile($urlimage),
-            'reply_markup' => $reply_markup,
-            'caption' => $caption,
-            'parse_mode' => "HTML",
-        ]);
-        unlink($urlimage);
         if ($panel_info['type'] == "WGDashboard") {
             $urlimage = "{$panel_info['inboundid']}_{$username_service}.conf";
             file_put_contents($urlimage, $sub_link);
-            sendDocument($user_id, $urlimage, "⚙️ کانفیگ شما");
+            telegram('senddocument', [
+                'chat_id' => $user_id,
+                'document' => new CURLFile($urlimage),
+                'reply_markup' => $reply_markup,
+                'caption' => $caption,
+                'parse_mode' => "HTML",
+            ]);
+            unlink($urlimage);
+        } else {
+            $urlimage = "$user_id$invoice_id.png";
+            $qrCode = createqrcode($out_put_qrcode);
+            file_put_contents($urlimage, $qrCode->getString());
+            addBackgroundImage($urlimage, $qrCode, $image);
+            telegram('sendphoto', [
+                'chat_id' => $user_id,
+                'photo' => new CURLFile($urlimage),
+                'reply_markup' => $reply_markup,
+                'caption' => $caption,
+                'parse_mode' => "HTML",
+            ]);
             unlink($urlimage);
         }
     } else {

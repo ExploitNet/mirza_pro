@@ -1,10 +1,10 @@
 <?php
 ini_set('error_log', 'error_log');
 
-require_once '../config.php';
-require_once '../Marzban.php';
-require_once '../function.php';
-require_once '../panels.php';
+require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../Marzban.php';
+require_once __DIR__ . '/../function.php';
+require_once __DIR__ . '/../panels.php';
 $ManagePanel = new ManagePanel();
 $url = $_SERVER['REQUEST_URI'];
 $parts = explode("/sub/", $url);

@@ -1,6 +1,6 @@
 <?php
 session_start();
-require_once '../config.php';
+require_once __DIR__ . '/../config.php';
 $query = $pdo->prepare("SELECT * FROM admin WHERE username=:username");
     $query->bindParam("username", $_SESSION["user"], PDO::PARAM_STR);
     $query->execute();

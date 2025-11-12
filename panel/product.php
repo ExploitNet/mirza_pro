@@ -1,7 +1,7 @@
 <?php
 session_start();
-require_once '../config.php';
-require_once '../function.php';
+require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../function.php';
 $query = $pdo->prepare("SELECT * FROM admin WHERE username=:username");
     $query->bindParam("username", $_SESSION["user"], PDO::PARAM_STR);
     $query->execute();
@@ -16,38 +16,39 @@ if( !isset($_SESSION["user"]) || !$result ){
     header('Location: login.php');
     return;
 }
-if($_POST['nameproduct']){
+$nameProduct = $_POST['nameproduct'] ?? null;
+if(!empty($nameProduct)){
     $randomString = bin2hex(random_bytes(2));
     $userdata['data_limit_reset'] = "no_reset";
-    $product = select("product","*","name_product",$_POST['nameproduct'],"count");
+    $product = select("product","*","name_product",$nameProduct,"count");
     if($product != 0){
         echo "alert(\"محصول از قبل وجود دارد\")";
         return;
     }
     $hidepanel = "{}";
     $stmt = $pdo->prepare("INSERT IGNORE INTO product (name_product,code_product,price_product,Volume_constraint,Service_time,Location,agent,data_limit_reset,note,category,hide_panel,one_buy_status) VALUES (:name_product,:code_product,:price_product,:Volume_constraint,:Service_time,:Location,:agent,:data_limit_reset,:note,:category,:hide_panel,'0')");
-    $stmt->bindParam(':name_product', $_POST['nameproduct'], PDO::PARAM_STR);
+    $stmt->bindParam(':name_product', $nameProduct, PDO::PARAM_STR);
     $stmt->bindParam(':code_product', $randomString);
-    $stmt->bindParam(':price_product', $_POST['price_product'], PDO::PARAM_STR);
-    $stmt->bindParam(':Volume_constraint', $_POST['volume_product'], PDO::PARAM_STR);
-    $stmt->bindParam(':Service_time', $_POST['time_product'], PDO::PARAM_STR);
-    $stmt->bindParam(':Location', $_POST['namepanel'], PDO::PARAM_STR);
-    $stmt->bindParam(':agent', $_POST['agent_product'], PDO::PARAM_STR);
+    $stmt->bindParam(':price_product', $_POST['price_product'] ?? '', PDO::PARAM_STR);
+    $stmt->bindParam(':Volume_constraint', $_POST['volume_product'] ?? '', PDO::PARAM_STR);
+    $stmt->bindParam(':Service_time', $_POST['time_product'] ?? '', PDO::PARAM_STR);
+    $stmt->bindParam(':Location', $_POST['namepanel'] ?? '', PDO::PARAM_STR);
+    $stmt->bindParam(':agent', $_POST['agent_product'] ?? '', PDO::PARAM_STR);
     $stmt->bindParam(':data_limit_reset', $userdata['data_limit_reset']);
-    $stmt->bindParam(':category', $_POST['cetegory_product']  , PDO::PARAM_STR);
-    $stmt->bindParam(':note', $_POST['note_product']  , PDO::PARAM_STR);
+    $stmt->bindParam(':category', $_POST['cetegory_product'] ?? ''  , PDO::PARAM_STR);
+    $stmt->bindParam(':note', $_POST['note_product'] ?? ''  , PDO::PARAM_STR);
     $stmt->bindParam(':hide_panel', $hidepanel);
     $stmt->execute();
     header("Location: product.php");
 }
-if($_GET['oneproduct'] && $_GET['toweproduct']){
+if(isset($_GET['oneproduct'], $_GET['toweproduct']) && $_GET['oneproduct'] !== '' && $_GET['toweproduct'] !== ''){
     update("product", "id", 10000, "id", $_GET['oneproduct']);
     update("product", "id", intval($_GET['oneproduct']), "id", intval($_GET['toweproduct']));
     update("product", "id", intval($_GET['toweproduct']), "id", 10000);
     header("Location: product.php");
 }
 
-if($_GET['removeid'] && $_GET['removeid']){
+if(isset($_GET['removeid']) && $_GET['removeid'] !== ''){
     $stmt = $connect->prepare("DELETE FROM product WHERE id = ?");
     $stmt->bind_param("s", $_GET['removeid']);
     $stmt->execute();

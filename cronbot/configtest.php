@@ -1,9 +1,9 @@
 <?php
 date_default_timezone_set('Asia/Tehran');
-require_once '../config.php';
-require_once '../botapi.php';
-require_once '../panels.php';
-require_once '../function.php';
+require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../botapi.php';
+require_once __DIR__ . '/../panels.php';
+require_once __DIR__ . '/../function.php';
 $ManagePanel = new ManagePanel();
 $datatextbotget = select("textbot", "*",null ,null ,"fetchAll");
 $datatxtbot = array();

@@ -1,11 +1,11 @@
 <?php
 ini_set('error_log', 'error_log');
-require_once '../config.php';
-require_once '../botapi.php';
-require_once '../panels.php';
-require_once '../jdf.php';
-require_once '../function.php';
-require '../vendor/autoload.php';
+require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../botapi.php';
+require_once __DIR__ . '/../panels.php';
+require_once __DIR__ . '/../jdf.php';
+require_once __DIR__ . '/../function.php';
+require __DIR__ . '/../vendor/autoload.php';
 $ManagePanel = new ManagePanel();
 $setting = mysqli_fetch_assoc(mysqli_query($connect, "SELECT * FROM setting"));
 $paymentreports = select("topicid","idreport","report","paymentreport","select")['idreport'];

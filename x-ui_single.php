@@ -66,8 +66,24 @@ function get_clinets($username, $namepanel)
     $req->setHeaders($headers);
     $req->setCookie('cookie.txt');
     $response = $req->get();
-    error_log(json_encode($response));
-    unlink('cookie.txt');
+
+    if (isset($response['body'])) {
+        $decodedBody = json_decode($response['body'], true);
+        if (json_last_error() === JSON_ERROR_NONE && is_array($decodedBody)) {
+            if (isset($decodedBody['success']) && $decodedBody['success'] === false) {
+                $response['error'] = $decodedBody['msg'] ?? 'Unknown panel error';
+            }
+        }
+    }
+
+    if (!empty($response['error'])) {
+        error_log(json_encode($response));
+    }
+
+    if (is_file('cookie.txt')) {
+        @unlink('cookie.txt');
+    }
+
     return $response;
 }
 function addClient($namepanel, $usernameac, $Expire, $Total, $Uuid, $Flow, $subid, $inboundid, $name_product, $note = "")

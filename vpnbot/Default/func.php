@@ -1,5 +1,20 @@
 <?php
 
+function readJsonFileIfExists($path, $default = [])
+{
+    if (!is_file($path)) {
+        return $default;
+    }
+
+    $content = file_get_contents($path);
+    if ($content === false || $content === '') {
+        return $default;
+    }
+
+    $decoded = json_decode($content, true);
+    return is_array($decoded) ? $decoded : $default;
+}
+
 function DirectPaymentbot($order_id,$image = 'images.jpg'){
     global $pdo,$ManagePanel,$textbotlang,$keyboardextendfnished,$keyboard,$Confirm_pay,$from_id,$message_id,$datatextbot;
     $setting = select("setting", "*");

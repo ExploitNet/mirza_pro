@@ -71,7 +71,11 @@ class CurlRequest {
         if (curl_errno($ch)) {
             $error = curl_error($ch);
             curl_close($ch);
-            return ['error' => $error];
+            return [
+                'status' => null,
+                'body' => null,
+                'error' => $error,
+            ];
         }
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);

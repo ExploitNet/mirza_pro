@@ -39,6 +39,7 @@ try {
             cardpayment VARCHAR(100) NOT NULL,
             codeInvitation VARCHAR(100) NULL,
             pricediscount VARCHAR(100) NULL   DEFAULT '0',
+            hide_mini_app_instruction VARCHAR(20) NULL   DEFAULT '0',
             maxbuyagent VARCHAR(100) NULL   DEFAULT '0',
             joinchannel VARCHAR(100) NULL   DEFAULT '0',
             checkstatus VARCHAR(50) NULL   DEFAULT '0',
@@ -77,6 +78,7 @@ try {
         addFieldToTable($tableName, 'pagenumber', '');
         addFieldToTable($tableName, 'codeInvitation', null);
         addFieldToTable($tableName, 'pricediscount', "0");
+        addFieldToTable($tableName, 'hide_mini_app_instruction', '0', "VARCHAR(20)");
     }
 } catch (PDOException $e) {
     file_put_contents('error_log user', $e->getMessage());
@@ -412,10 +414,20 @@ try {
         addFieldToTable("marzban_panel", "status", "active", "VARCHAR(50)");
         addFieldToTable("marzban_panel", "sublink", "onsublink", "VARCHAR(50)");
         addFieldToTable("marzban_panel", "config", "offconfig", "VARCHAR(50)");
+        $max_stmt = $connect->query("SELECT MAX(CAST(SUBSTRING(code_panel, 3) AS UNSIGNED)) as max_num FROM marzban_panel WHERE code_panel LIKE '7e%'");
+        $max_row = $max_stmt->fetch_assoc();
+        $next_num = $max_row['max_num'] ? (int)$max_row['max_num'] + 1 : 15;
+        $stmt = $connect->query("SELECT id FROM marzban_panel WHERE code_panel IS NULL OR code_panel = ''");
+        while ($row = $stmt->fetch_assoc()) {
+            $code = '7e' . $next_num;
+            $connect->query("UPDATE marzban_panel SET code_panel = '$code' WHERE id = " . $row['id']);
+            $next_num++;
+        }
     }
 } catch (Exception $e) {
     file_put_contents('error_log', $e->getMessage());
 }
+
 //-----------------------------------------------------------------
 try {
 
@@ -542,21 +554,23 @@ try {
     if (!$table_exists) {
         $result = $connect->query("CREATE TABLE Payment_report (
         id INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-        id_user varchar(200),
-        id_order varchar(2000),
-        time varchar(200)  NULL,
-        at_updated varchar(200)  NULL,
-        price varchar(200) NULL,
-        dec_not_confirmed TEXT NULL,
-        Payment_Method varchar(400) NULL,
-        payment_Status varchar(100) NULL,
-        bottype varchar(300) NULL,
+        id_user varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+        id_order varchar(2000) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+        time varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
+        at_updated varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
+        price varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
+        dec_not_confirmed TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
+        Payment_Method varchar(400) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
+        payment_Status varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
+        bottype varchar(300) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
         message_id INT NULL,
-        id_invoice varchar(1000) NULL)");
+        id_invoice varchar(1000) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL)
+        ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
         if (!$result) {
             echo "table Payment_report" . mysqli_error($connect);
         }
     } else {
+        ensureTableUtf8mb4('Payment_report');
         addFieldToTable("Payment_report", "message_id", null, "INT");
         $Check_filde = $connect->query("SHOW COLUMNS FROM Payment_report LIKE 'Payment_Method'");
         if (mysqli_num_rows($Check_filde) != 1) {
@@ -1183,10 +1197,21 @@ try {
         $result = $connect->query("CREATE TABLE card_number (
         cardnumber varchar(500) PRIMARY KEY,
         namecard  varchar(1000)  NOT NULL)
-        ");
+        CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
         if (!$result) {
             echo "table x_ui" . mysqli_error($connect);
         }
+    }
+    $columnInfo = $connect->query("SHOW FULL COLUMNS FROM card_number LIKE 'namecard'");
+    if ($columnInfo) {
+        $column = $columnInfo->fetch_assoc();
+        $currentCollation = $column['Collation'] ?? '';
+        if (empty($currentCollation) || stripos($currentCollation, 'utf8mb4') === false) {
+            $connect->query("ALTER TABLE card_number CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+            $connect->query("ALTER TABLE card_number MODIFY cardnumber varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci PRIMARY KEY");
+            $connect->query("ALTER TABLE card_number MODIFY namecard varchar(1000) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL");
+        }
+        $columnInfo->free();
     }
 } catch (Exception $e) {
     file_put_contents('error_log card_number', $e->getMessage());
@@ -1197,15 +1222,18 @@ try {
 
     if (!$table_exists) {
         $result = $connect->query("CREATE TABLE Requestagent (
-        id varchar(500) PRIMARY KEY,
-        username  varchar(500)  NOT NULL,
-        time  varchar(500)  NOT NULL,
-        Description  varchar(500)  NOT NULL,
-        status  varchar(500)  NOT NULL,
-        type  varchar(500)  NOT NULL)");
+        id varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci PRIMARY KEY,
+        username  varchar(500)  CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+        time  varchar(500)  CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+        Description  varchar(500)  CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+        status  varchar(500)  CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+        type  varchar(500)  CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL)
+        ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
         if (!$result) {
             echo "table Requestagent" . mysqli_error($connect);
         }
+    } else {
+        ensureTableUtf8mb4('Requestagent');
     }
 } catch (Exception $e) {
     file_put_contents('error_log Requestagent', $e->getMessage());
@@ -1458,7 +1486,7 @@ $connect->query("ALTER TABLE `invoice` CHANGE `username` `username` VARCHAR(200)
 $connect->query("ALTER TABLE `invoice` CHANGE `Service_location` `Service_location` VARCHAR(200)");
 $connect->query("ALTER TABLE `invoice` CHANGE `time_sell` `time_sell` VARCHAR(200)");
 $connect->query("ALTER TABLE marzban_panel MODIFY name_panel VARCHAR(255) COLLATE utf8mb4_bin");
-$connect->query("ALTER TABLE product MODIFY name_product VARCHAR(255) COLLATE utf8mb4_bin");
+$connect->query("ALTER TABLE product MODIFY name_product VARCHAR(1000) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin");
 $connect->query("ALTER TABLE help MODIFY name_os VARCHAR(500) COLLATE utf8mb4_bin");
 telegram('setwebhook', [
     'url' => "https://$domainhosts/index.php"

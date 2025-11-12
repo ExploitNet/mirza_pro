@@ -380,7 +380,13 @@ class ManagePanel
         $Output = array();
         global $pdo, $domainhosts, $new_marzban;
         $Get_Data_Panel = select("marzban_panel", "*", "name_panel", $name_panel, "select");
-        if ($Get_Data_Panel['subvip'] == "onsubvip") {
+        if (!$Get_Data_Panel || !is_array($Get_Data_Panel)) {
+            return array(
+                'status' => 'Unsuccessful',
+                'msg' => 'Panel Not Found'
+            );
+        }
+        if (isset($Get_Data_Panel['subvip']) && $Get_Data_Panel['subvip'] == "onsubvip") {
             $inoice = select("invoice", "*", "username", $username, "select");
         } else {
             $inoice = false;
@@ -424,9 +430,15 @@ class ManagePanel
                             'msg' => $sublist_update['status']
                         );
                     }
-                    $sublist_update = json_decode($sublist_update['body'], true)['updates'][0];
-                    $UsernameData['sub_updated_at'] = $sublist_update['created_at'];
-                    $UsernameData['sub_last_user_agent'] = $sublist_update['user_agent'];
+                    $sublist_update_body = json_decode($sublist_update['body'], true);
+                    if (!empty($sublist_update_body['updates']) && is_array($sublist_update_body['updates'])) {
+                        $first_update = $sublist_update_body['updates'][0];
+                        $UsernameData['sub_updated_at'] = isset($first_update['created_at']) ? $first_update['created_at'] : null;
+                        $UsernameData['sub_last_user_agent'] = isset($first_update['user_agent']) ? $first_update['user_agent'] : null;
+                    } else {
+                        $UsernameData['sub_updated_at'] = isset($UsernameData['sub_updated_at']) ? $UsernameData['sub_updated_at'] : null;
+                        $UsernameData['sub_last_user_agent'] = isset($UsernameData['sub_last_user_agent']) ? $UsernameData['sub_last_user_agent'] : null;
+                    }
                 } else {
                     $UsernameData['expire'] = $UsernameData['expire'];
                 }
@@ -434,7 +446,7 @@ class ManagePanel
                     $UsernameData['subscription_url'] = "https://$domainhosts/sub/" . $inoice['id_invoice'];
                 }
                 if ($new_marzban) {
-                    $UsernameData['proxies'] = $UsernameData['proxy_settings'];
+                    $UsernameData['proxies'] = isset($UsernameData['proxy_settings']) ? $UsernameData['proxy_settings'] : null;
                 }
                 $Output = array(
                     'status' => $UsernameData['status'],
@@ -576,7 +588,7 @@ class ManagePanel
             $links_user = explode("\n", trim($links_user));
             if ($inoice != false)
                 $linksub = "https://$domainhosts/sub/" . $inoice['id_invoice'];
-            $user_data['lastOnline'] = $user_data['lastOnline'] == 0 ? "offline" : date('Y-m-d H:i:s', $user_data['lastOnline'] / 1000);
+            $user_data['lastOnline'] = $user_data['lastOnline'] == 0 ? "offline" : (new DateTime('@' . ($user_data['lastOnline'] / 1000)))->format('Y-m-d H:i:s');
             $Output = array(
                 'status' => $user_data['enable'],
                 'username' => $user_data['email'],
@@ -603,26 +615,29 @@ class ManagePanel
                     'msg' => $UsernameData['message']
                 );
             } else {
-                if ($UsernameData['start_date'] == null) {
+                $startDate = $UsernameData['start_date'] ?? null;
+                if ($startDate === null) {
                     $date = 0;
                 } else {
-                    $current_date = time();
-                    $start_date = strtotime($UsernameData['start_date']);
-                    $end_date = $start_date + ($UsernameData['package_days'] * 86400);
+                    $start_date = strtotime($startDate);
+                    $package_days = isset($UsernameData['package_days']) ? intval($UsernameData['package_days']) : 0;
+                    $end_date = $start_date + ($package_days * 86400);
                     $date = strtotime(date("Y-m-d H:i:s", $end_date));
                 }
-                $UsernameData['usage_limit_GB'] = $UsernameData['usage_limit_GB'] * pow(1024, 3);
-                $UsernameData['current_usage_GB'] = $UsernameData['current_usage_GB'] * pow(1024, 3);
-                $linksuburl = "{$Get_Data_Panel['linksubx']}/{$UsernameData['uuid']}/";
-                $linksubconfig = $linksuburl . "sub";
-                if ($UsernameData['last_online'] == "1-01-01 00:00:00") {
-                    $UsernameData['last_online'] = null;
+                $usageLimit = isset($UsernameData['usage_limit_GB']) ? $UsernameData['usage_limit_GB'] * pow(1024, 3) : 0;
+                $currentUsage = isset($UsernameData['current_usage_GB']) ? $UsernameData['current_usage_GB'] * pow(1024, 3) : 0;
+                $uuid = $UsernameData['uuid'] ?? null;
+                $linksuburl = $uuid ? "{$Get_Data_Panel['linksubx']}/{$uuid}/" : $Get_Data_Panel['linksubx'];
+                $lastOnline = $UsernameData['last_online'] ?? null;
+                if ($lastOnline == "1-01-01 00:00:00") {
+                    $lastOnline = null;
                 }
-                if ($UsernameData['usage_limit_GB'] - $UsernameData['current_usage_GB'] <= 0) {
+                $remainingTraffic = $usageLimit - $currentUsage;
+                if ($usageLimit > 0 && $remainingTraffic <= 0) {
                     $status = "limited";
-                } elseif ($date - time() <= 0 and $date != 0) {
+                } elseif ($date != 0 && ($date - time()) <= 0) {
                     $status = "expired";
-                } elseif ($UsernameData['start_date'] == null) {
+                } elseif ($startDate === null) {
                     $status = "on_hold";
                 } else {
                     $status = "active";
@@ -632,11 +647,11 @@ class ManagePanel
                 }
                 $Output = array(
                     'status' => $status,
-                    'username' => $UsernameData['name'],
-                    'data_limit' => $UsernameData['usage_limit_GB'],
+                    'username' => $UsernameData['name'] ?? ($UsernameData['email'] ?? $username),
+                    'data_limit' => $usageLimit,
                     'expire' => $date,
-                    'online_at' => $UsernameData['last_online'],
-                    'used_traffic' => $UsernameData['current_usage_GB'],
+                    'online_at' => $lastOnline,
+                    'used_traffic' => $currentUsage,
                     'links' => [],
                     'subscription_url' => $linksuburl,
                     'sub_updated_at' => null,

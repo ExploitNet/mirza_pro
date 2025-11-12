@@ -5,6 +5,12 @@ date_default_timezone_set('Asia/Tehran');
 #-----------------------------#
 function token_panel($code_panel,$verify = true){
     $panel = select("marzban_panel","*","code_panel",$code_panel,"select");
+    
+    // Check if panel data exists
+    if ($panel === null) {
+        return null;
+    }
+    
     $url_get_token = $panel['url_panel'].'/api/admin/token';
     $username_panel = $panel['username_panel'];
     $password_panel = $panel['password_panel'];

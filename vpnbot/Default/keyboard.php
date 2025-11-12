@@ -15,7 +15,18 @@ $keyboarddate = array(
 );
 $list_admin = select("botsaz", "*", "bot_token", $ApiToken, "select");
 $admin_idsmain = select("admin", "id_admin", null, null, "FETCH_COLUMN");
-if (!in_array($from_id, json_decode($list_admin['admin_ids'], true)) && !in_array($from_id, $admin_idsmain)) unset($keyboarddate['text_Admin']);
+$admin_ids_decoded = json_decode($list_admin['admin_ids'] ?? '[]', true);
+if (!is_array($admin_ids_decoded)) {
+    $admin_ids_decoded = [];
+}
+
+if (!is_array($admin_idsmain)) {
+    $admin_idsmain = [];
+}
+
+if (!in_array($from_id, $admin_ids_decoded) && !in_array($from_id, $admin_idsmain)) {
+    unset($keyboarddate['text_Admin']);
+}
 $keyboard = ['keyboard' => [], 'resize_keyboard' => true];
 $tempArray = [];
 
@@ -75,7 +86,7 @@ $keyboardadmin = json_encode([
         ],
         [
             ['text' => "📞 تنظیم نام کاربری پشتیبانی"],
-            ['text' => "🆕 آپدیت ربات"],
+            ['text' => "📬 گزارش ربات"],
         ],
         [
             ['text' => "📣 جوین اجباری"]
@@ -175,8 +186,8 @@ function KeyboardProduct($location, $query, $pricediscount, $datakeyboard, $stat
     $stmt->execute();
     $valuetow = $valuetow != null ? "-$valuetow" : "";
     while ($result = $stmt->fetch(PDO::FETCH_ASSOC)) {
-        $productlist = json_decode(file_get_contents('product.json'), true);
-        $productlist_name = json_decode(file_get_contents('product_name.json'), true);
+        $productlist = readJsonFileIfExists('product.json');
+        $productlist_name = readJsonFileIfExists('product_name.json');
         if (isset($productlist[$result['code_product']])) $result['price_product'] = $productlist[$result['code_product']];
         $result['name_product'] = empty($productlist_name[$result['code_product']]) ? $result['name_product'] : $productlist_name[$result['code_product']];
         $hide_panel = json_decode($result['hide_panel'], true);

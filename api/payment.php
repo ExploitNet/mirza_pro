@@ -1,10 +1,10 @@
 <?php
 
 // Configuration and includes
-require_once '../config.php';
-require_once '../function.php';
-require_once '../botapi.php';
-require_once '../panels.php';
+require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../function.php';
+require_once __DIR__ . '/../botapi.php';
+require_once __DIR__ . '/../panels.php';
 header('Content-Type: application/json');
 date_default_timezone_set('Asia/Tehran');
 ini_set('default_charset', 'UTF-8');
