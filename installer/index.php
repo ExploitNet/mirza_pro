@@ -3,18 +3,15 @@ $uPOST = sanitizeInput($_POST);
 $rootDirectory = dirname(__DIR__) . '/';
 $configDirectory = $rootDirectory . 'config.php';
 $tablesDirectory = $rootDirectory . 'table.php';
-
 if (!file_exists($configDirectory) || !file_exists($tablesDirectory)) {
     $ERROR[] = "فایل های پروژه ناقص هستند.";
     $ERROR[] = "فایل های پروژه را مجددا دانلود و بارگذاری کنید (<a href='https://github.com/mahdiMGF2/mirza_pro'>‎🌐 Github</a>)";
 }
-
 if (phpversion() < 8.2) {
     $ERROR[] = "نسخه PHP شما باید حداقل 8.2 باشد.";
     $ERROR[] = "نسخه فعلی: " . phpversion();
     $ERROR[] = "لطفا نسخه PHP خود را به 8.2 یا بالاتر ارتقا دهید.";
 }
-
 if (!empty($_SERVER['SCRIPT_URI'])) {
     $URI = str_replace($_SERVER['REQUEST_SCHEME'] . '://', '', $_SERVER['SCRIPT_URI']);
     if (basename($URI) == 'index.php') {
@@ -25,24 +22,19 @@ if (!empty($_SERVER['SCRIPT_URI'])) {
     $tempPath = dirname(dirname($_SERVER['SCRIPT_NAME']));
     $webAddress = rtrim($_SERVER['HTTP_HOST'] . $tempPath, '/') . '/';
 }
-
 $success = false;
 $tgBot = [];
 $botFirstMessage = '';
 $installType = $uPOST['install_type'] ?? 'simple';
 $hasDbBackup = $uPOST['has_db_backup'] ?? 'no';
-
-
 function needsBackupUpload($installType, $hasDbBackup) {
     if ($installType == 'simple') return false;
     if ($installType == 'migrate_free_to_pro' && $hasDbBackup == 'yes') return false;
     return ($installType == 'migrate_free_to_pro' && $hasDbBackup == 'no');
 }
-
 function needsMigration($installType) {
     return ($installType == 'migrate_free_to_pro');
 }
-
 function isHttps() {
     return (
         ($_SERVER['REQUEST_SCHEME'] ?? 'http') === 'https' ||
@@ -50,7 +42,6 @@ function isHttps() {
         ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https'
     );
 }
-
 function addFieldToTable($tableName, $fieldName, $defaultValue, $fieldType = 'VARCHAR(100)', $connect) {
     $check = $connect->query("SHOW COLUMNS FROM `$tableName` LIKE '$fieldName'");
     if ($check->num_rows == 0) {
@@ -60,7 +51,6 @@ function addFieldToTable($tableName, $fieldName, $defaultValue, $fieldType = 'VA
     }
     return true;
 }
-
 function cleanSQLContent($sql) {
     $sql = str_replace("\xEF\xBB\xBF", '', $sql);
     $problematicStatements = [
@@ -90,7 +80,6 @@ function cleanSQLContent($sql) {
     $sql = $charset_declaration . $sql;
     return $sql;
 }
-
 function splitSQLQueries($sql) {
     $queries = [];
     $currentQuery = '';
@@ -135,51 +124,42 @@ function splitSQLQueries($sql) {
     }
     return $queries;
 }
-
 function handleDatabaseImport($dbInfo, &$ERROR) {
     $debugFile = dirname(__DIR__) . '/backup_import_log_' . date('Y-m-d_H-i-s') . '.txt';
     $logHandle = @fopen($debugFile, 'w');
-
     function writeLog($handle, $message) {
         if ($handle) {
             $timestamp = date('Y-m-d H:i:s');
             fwrite($handle, "[{$timestamp}] {$message}\n");
         }
     }
-
     writeLog($logHandle, "========================================");
     writeLog($logHandle, "شروع Import بکاپ دیتابیس");
     writeLog($logHandle, "========================================");
     writeLog($logHandle, "Database: " . $dbInfo['name']);
     writeLog($logHandle, "Username: " . $dbInfo['username']);
-
     if (!isset($_FILES['backup_file']) || $_FILES['backup_file']['error'] == UPLOAD_ERR_NO_FILE) {
         writeLog($logHandle, "❌ خطا: فایل بکاپ آپلود نشد");
         $ERROR[] = "لطفاً فایل بکاپ را انتخاب کنید (SQL یا ZIP).";
         if ($logHandle) fclose($logHandle);
         return false;
     }
-
     if ($_FILES['backup_file']['error'] != UPLOAD_ERR_OK) {
         writeLog($logHandle, "❌ خطا در آپلود فایل: " . $_FILES['backup_file']['error']);
         $ERROR[] = "خطا در آپلود فایل بکاپ.";
         if ($logHandle) fclose($logHandle);
         return false;
     }
-
     $uploadedFile = $_FILES['backup_file']['tmp_name'];
     $fileName = $_FILES['backup_file']['name'];
     $fileSize = $_FILES['backup_file']['size'] ?? 0;
     $fileExt = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
-
     writeLog($logHandle, "\n📁 اطلاعات فایل:");
     writeLog($logHandle, " نام: {$fileName}");
     writeLog($logHandle, " حجم: " . number_format($fileSize) . " بایت (" . round($fileSize / 1024, 2) . " KB)");
     writeLog($logHandle, " توسعه: {$fileExt}");
     writeLog($logHandle, " مسیر موقت: {$uploadedFile}");
-
     $sqlContent = '';
-
     if ($fileExt == 'zip') {
         writeLog($logHandle, "\n🗜️ پردازش فایل ZIP...");
         if (!class_exists('ZipArchive')) {
@@ -226,14 +206,12 @@ function handleDatabaseImport($dbInfo, &$ERROR) {
         if ($logHandle) fclose($logHandle);
         return false;
     }
-
     if (empty($sqlContent)) {
         writeLog($logHandle, "❌ محتوای SQL خالی است");
         $ERROR[] = "فایل SQL خالی است.";
         if ($logHandle) fclose($logHandle);
         return false;
     }
-
     writeLog($logHandle, "\n🧹 پاکسازی SQL Content...");
     $originalLength = strlen($sqlContent);
     $sqlContent = cleanSQLContent($sqlContent);
@@ -241,7 +219,6 @@ function handleDatabaseImport($dbInfo, &$ERROR) {
     writeLog($logHandle, " قبل: " . number_format($originalLength) . " بایت");
     writeLog($logHandle, " بعد: " . number_format($cleanedLength) . " بایت");
     writeLog($logHandle, " حذف شده: " . number_format($originalLength - $cleanedLength) . " بایت");
-
     writeLog($logHandle, "\n✂️ تقسیم Queries...");
     $queries = splitSQLQueries($sqlContent);
     writeLog($logHandle, "✅ تعداد Queries: " . count($queries));
@@ -250,7 +227,6 @@ function handleDatabaseImport($dbInfo, &$ERROR) {
         $preview = substr(str_replace("\n", " ", $queries[$i]), 0, 100);
         writeLog($logHandle, " [{$i}] {$preview}...");
     }
-
     try {
         writeLog($logHandle, "\n🔌 اتصال به MySQL...");
         $mysqli = new mysqli('localhost', $dbInfo['username'], $dbInfo['password'], $dbInfo['name']);
@@ -271,22 +247,18 @@ function handleDatabaseImport($dbInfo, &$ERROR) {
         writeLog($logHandle, "✅ AUTOCOMMIT = 0");
         $mysqli->query("START TRANSACTION");
         writeLog($logHandle, "✅ Transaction شروع شد");
-
         $successCount = 0;
         $failCount = 0;
         $errorMessages = [];
         $tableStats = [];
-
         writeLog($logHandle, "\n" . str_repeat("=", 80));
         writeLog($logHandle, "🚀 اجرای Queries...");
         writeLog($logHandle, str_repeat("=", 80));
-
         foreach ($queries as $queryIndex => $query) {
             $query = trim($query);
             if (empty($query) || (substr($query, 0, 2) == '--' && strpos($query, 'INSERT') === false && strpos($query, 'CREATE') === false) || substr($query, 0, 1) == '#') {
                 continue;
             }
-
             $queryType = '';
             $tableName = '';
             if (preg_match('/^(DROP|CREATE|INSERT|ALTER|UPDATE|DELETE)\s+(TABLE\s+)?(?:IF\s+EXISTS\s+)?(?:INTO\s+)?`?([^`\s(]+)`?/i', $query, $matches)) {
@@ -295,9 +267,7 @@ function handleDatabaseImport($dbInfo, &$ERROR) {
                     $tableName = $matches[3];
                 }
             }
-
             $queryPreview = substr(str_replace("\n", " ", $query), 0, 100);
-
             if ($mysqli->query($query)) {
                 $successCount++;
                 if (!isset($tableStats[$tableName])) {
@@ -323,14 +293,12 @@ function handleDatabaseImport($dbInfo, &$ERROR) {
                 }
             }
         }
-
         $mysqli->query("COMMIT");
         writeLog($logHandle, "\n✅ Transaction COMMIT شد");
         $mysqli->query("SET FOREIGN_KEY_CHECKS=1");
         writeLog($logHandle, "✅ FOREIGN_KEY_CHECKS = 1");
         $mysqli->close();
         writeLog($logHandle, "✅ اتصال بسته شد");
-
         writeLog($logHandle, "\n" . str_repeat("=", 80));
         writeLog($logHandle, "📊 خلاصه نتایج:");
         writeLog($logHandle, str_repeat("=", 80));
@@ -338,7 +306,6 @@ function handleDatabaseImport($dbInfo, &$ERROR) {
         writeLog($logHandle, "❌ ناموفق: {$failCount}");
         writeLog($logHandle, "📊 کل: " . ($successCount + $failCount));
         writeLog($logHandle, "📊 نرخ موفقیت: " . round(($successCount / max(1, $successCount + $failCount)) * 100, 2) . "%");
-
         if (!empty($tableStats)) {
             writeLog($logHandle, "\n📋 آمار هر جدول:");
             foreach ($tableStats as $table => $stats) {
@@ -349,7 +316,6 @@ function handleDatabaseImport($dbInfo, &$ERROR) {
                 }
             }
         }
-
         if ($failCount > 0 && $successCount == 0) {
             writeLog($logHandle, "\n🔴 نتیجه نهایی: ناموفق");
             $ERROR[] = "❌ خطا در ایمپورت دیتابیس";
@@ -361,7 +327,6 @@ function handleDatabaseImport($dbInfo, &$ERROR) {
             if ($logHandle) fclose($logHandle);
             return false;
         }
-
         if ($failCount > 0) {
             writeLog($logHandle, "\n🟡 نتیجه نهایی: موفق با هشدار");
             $ERROR[] = "⚠️ تعدادی از کوئری‌ها با خطا مواجه شدند ($failCount خطا از " . ($successCount + $failCount) . " کوئری)";
@@ -369,7 +334,6 @@ function handleDatabaseImport($dbInfo, &$ERROR) {
         } else {
             writeLog($logHandle, "\n🟢 نتیجه نهایی: موفق");
         }
-
         writeLog($logHandle, "\n========================================");
         writeLog($logHandle, "پایان Import");
         writeLog($logHandle, "========================================");
@@ -382,7 +346,6 @@ function handleDatabaseImport($dbInfo, &$ERROR) {
         return false;
     }
 }
-
 function runCompleteMigration($dbInfo, $adminNumber, &$migrationLog) {
     try {
         $connect = new mysqli('localhost', $dbInfo['username'], $dbInfo['password'], $dbInfo['name']);
@@ -392,14 +355,12 @@ function runCompleteMigration($dbInfo, $adminNumber, &$migrationLog) {
         }
         $connect->set_charset("utf8mb4");
         $migrationLog[] = "✅ اتصال به دیتابیس";
-        $migrationLog[] = "📋 بخش 1:مرزبان پنل";
-
+        $migrationLog[] = "📋 بخش 1: مرزبان پنل (fixes خاص migration)";
         $check_old = $connect->query("SHOW TABLES LIKE 'marzbanpanel'");
         if ($check_old && $check_old->num_rows > 0) {
             $connect->query("RENAME TABLE `marzbanpanel` TO `marzban_panel`");
             $migrationLog[] = "✅ Rename: marzbanpanel → marzban_panel";
         }
-
         $result = $connect->query("SHOW TABLES LIKE 'marzban_panel'");
         $table_exists = ($result && $result->num_rows > 0);
         if ($table_exists) {
@@ -408,7 +369,6 @@ function runCompleteMigration($dbInfo, $adminNumber, &$migrationLog) {
                 $connect->query("ALTER TABLE `marzban_panel` DROP COLUMN `statusTest`");
                 $migrationLog[] = "🗑️ حذف statusTest";
             }
-
             $check = $connect->query("SHOW COLUMNS FROM `marzban_panel` LIKE 'configManual'");
             if ($check && $check->num_rows > 0) {
                 $check_config = $connect->query("SHOW COLUMNS FROM `marzban_panel` LIKE 'config'");
@@ -421,7 +381,6 @@ function runCompleteMigration($dbInfo, $adminNumber, &$migrationLog) {
                     $migrationLog[] = "✅ تنظیم config";
                 }
             }
-
             $check = $connect->query("SHOW COLUMNS FROM `marzban_panel` LIKE 'onholdstatus'");
             if ($check && $check->num_rows > 0) {
                 $check_onhold = $connect->query("SHOW COLUMNS FROM `marzban_panel` LIKE 'onholdtest'");
@@ -430,16 +389,13 @@ function runCompleteMigration($dbInfo, $adminNumber, &$migrationLog) {
                     $migrationLog[] = "✅ Rename: onholdstatus → onholdtest";
                 }
             }
-
             $connect->query("UPDATE `marzban_panel` SET `status` = 'active' WHERE `status` = 'activepanel'");
             $connect->query("UPDATE `marzban_panel` SET `status` = 'deactive' WHERE `status` = 'deactivepanel'");
-
             $VALUE = json_encode(['f' => 0, 'n' => 0, 'n2' => 0]);
             $value_price = json_encode(['f' => 4000, 'n' => 4000, 'n2' => 4000]);
             $value_main = json_encode(['f' => 1, 'n' => 1, 'n2' => 1]);
             $value_max = json_encode(['f' => 1000, 'n' => 1000, 'n2' => 1000]);
             $value_maxtime = json_encode(['f' => 365, 'n' => 365, 'n2' => 365]);
-
             $fields_added = 0;
             $addFields = [
                 ['proxies', null, 'TEXT'],
@@ -479,15 +435,12 @@ function runCompleteMigration($dbInfo, $adminNumber, &$migrationLog) {
                 ['sublink', 'onsublink', 'VARCHAR(50)'],
                 ['hosts', null, 'JSON']
             ];
-
             foreach ($addFields as $field) {
                 if (addFieldToTable('marzban_panel', $field[0], $field[1] ?? null, $field[2] ?? 'VARCHAR(100)', $connect)) {
                     $fields_added++;
                 }
             }
-
             $migrationLog[] = "✅ فیلدهای اضافه: $fields_added";
-
             $max_stmt = $connect->query("SELECT MAX(CAST(SUBSTRING(code_panel, 3) AS UNSIGNED)) as max_num FROM marzban_panel WHERE code_panel LIKE '7e%'");
             if ($max_stmt) {
                 $max_row = $max_stmt->fetch_assoc();
@@ -495,7 +448,6 @@ function runCompleteMigration($dbInfo, $adminNumber, &$migrationLog) {
             } else {
                 $next_num = 15;
             }
-
             $stmt = $connect->query("SELECT id FROM marzban_panel WHERE code_panel IS NULL OR code_panel = ''");
             if ($stmt) {
                 $updated_count = 0;
@@ -511,171 +463,7 @@ function runCompleteMigration($dbInfo, $adminNumber, &$migrationLog) {
                 }
             }
         }
-
-        $migrationLog[] = "📋 بخش 2: setting";
-        $connect->query("DROP TABLE IF EXISTS `setting`");
-        $sql = "CREATE TABLE `setting` (
-            `Bot_Status` varchar(200) DEFAULT NULL,
-            `roll_Status` varchar(200) DEFAULT NULL,
-            `get_number` varchar(200) DEFAULT NULL,
-            `iran_number` varchar(200) DEFAULT NULL,
-            `NotUser` varchar(200) DEFAULT NULL,
-            `Channel_Report` varchar(600) DEFAULT NULL,
-            `limit_usertest_all` varchar(600) DEFAULT NULL,
-            `affiliatesstatus` varchar(600) DEFAULT NULL,
-            `affiliatespercentage` varchar(600) DEFAULT NULL,
-            `removedayc` varchar(600) DEFAULT NULL,
-            `showcard` varchar(200) DEFAULT NULL,
-            `numbercount` varchar(600) DEFAULT NULL,
-            `statusnewuser` varchar(600) DEFAULT NULL,
-            `statusagentrequest` varchar(600) DEFAULT NULL,
-            `statuscategory` varchar(200) DEFAULT NULL,
-            `statusterffh` varchar(200) DEFAULT NULL,
-            `volumewarn` varchar(200) DEFAULT NULL,
-            `inlinebtnmain` varchar(200) DEFAULT NULL,
-            `verifystart` varchar(200) DEFAULT NULL,
-            `id_support` varchar(200) DEFAULT NULL,
-            `statusnamecustom` varchar(100) DEFAULT NULL,
-            `statuscategorygenral` varchar(100) DEFAULT NULL,
-            `statussupportpv` varchar(100) DEFAULT NULL,
-            `agentreqprice` varchar(100) DEFAULT NULL,
-            `bulkbuy` varchar(100) DEFAULT NULL,
-            `on_hold_day` varchar(100) DEFAULT NULL,
-            `cronvolumere` varchar(100) DEFAULT NULL,
-            `verifybucodeuser` varchar(100) DEFAULT NULL,
-            `scorestatus` varchar(100) DEFAULT NULL,
-            `Lottery_prize` text DEFAULT NULL,
-            `wheelـluck` varchar(45) DEFAULT NULL,
-            `wheelـluck_price` varchar(45) DEFAULT NULL,
-            `btn_status_extned` varchar(45) DEFAULT NULL,
-            `daywarn` varchar(45) DEFAULT NULL,
-            `categoryhelp` varchar(45) DEFAULT NULL,
-            `linkappstatus` varchar(45) DEFAULT NULL,
-            `iplogin` varchar(45) DEFAULT NULL,
-            `wheelagent` varchar(45) DEFAULT NULL,
-            `Lotteryagent` varchar(45) DEFAULT NULL,
-            `languageen` varchar(45) DEFAULT NULL,
-            `languageru` varchar(45) DEFAULT NULL,
-            `statusfirstwheel` varchar(45) DEFAULT NULL,
-            `statuslimitchangeloc` varchar(45) DEFAULT NULL,
-            `Debtsettlement` varchar(45) DEFAULT NULL,
-            `Dice` varchar(45) DEFAULT NULL,
-            `keyboardmain` text NOT NULL,
-            `statusnoteforf` varchar(45) NOT NULL,
-            `statuscopycart` varchar(45) NOT NULL,
-            `timeauto_not_verify` varchar(20) NOT NULL,
-            `status_keyboard_config` varchar(20) DEFAULT NULL,
-            `cron_status` text NOT NULL,
-            `limitnumber` varchar(200) DEFAULT NULL
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
-        if ($connect->query($sql) === TRUE) {
-            $sql = "INSERT INTO `setting` VALUES ('botstatuson', 'rolleon', 'offAuthenticationphone', 'offAuthenticationiran', 'offnotuser', NULL, '1', 'offaffiliates', '0', '0', '1', '0', 'onnewuser', 'onrequestagent', 'offcategory', NULL, '2', 'offinline', 'offverify', NULL, 'offnamecustom', 'offcategorys', 'offpvsupport', '0', 'onbulk', '4', '5', 'offverify', '0', '{\"one\":\"0\",\"tow\":\"0\",\"theree\":\"0\"}', '0', '0', NULL, '2', '0', '0', '0', '1', '1', '0', '0', '0', '0', '1', '0', '{\"keyboard\":[[{\"text\":\"text_sell\"},{\"text\":\"text_extend\"}],[{\"text\":\"text_usertest\"},{\"text\":\"text_wheel_luck\"}],[{\"text\":\"text_Purchased_services\"},{\"text\":\"accountwallet\"}],[{\"text\":\"text_affiliates\"},{\"text\":\"text_Tariff_list\"}],[{\"text\":\"text_support\"},{\"text\":\"text_help\"}]]}', '1', '0', '4', '1', '{\"day\":true,\"volume\":true,\"remove\":false,\"remove_volume\":false,\"test\":false,\"on_hold\":false,\"uptime_node\":false,\"uptime_panel\":false}', '{\"free\":100,\"all\":100}')";
-            $connect->query($sql);
-            $migrationLog[] = "✅ ایجاد setting";
-        }
-
-        $migrationLog[] = "📋 بخش 2.5: topicid";
-        $connect->query("DROP TABLE IF EXISTS `topicid`");
-        $sql = "CREATE TABLE `topicid` (
-            `report` varchar(500) NOT NULL,
-            `idreport` text NOT NULL,
-            PRIMARY KEY (`report`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
-        if ($connect->query($sql) === TRUE) {
-            $sql = "INSERT INTO `topicid` (`report`, `idreport`) VALUES
-                ('backupfile', '0'),
-                ('buyreport', '0'),
-                ('errorreport', '0'),
-                ('otherreport', '0'),
-                ('otherservice', '0'),
-                ('paymentreport', '0'),
-                ('porsantreport', '0'),
-                ('reportcron', '0'),
-                ('reportnight', '0'),
-                ('reporttest', '0')";
-            $connect->query($sql);
-            $migrationLog[] = "✅ ایجاد topicid";
-        }
-
-        $migrationLog[] = "📋 بخش 3: جداول جدید";
-        $tables_count = 0;
-        $createTables = [
-            "CREATE TABLE IF NOT EXISTS `app` (`id` int(6) UNSIGNED NOT NULL AUTO_INCREMENT, `nameapp` varchar(500) NOT NULL, `download_link` varchar(1000) NOT NULL, `os` varchar(200) NOT NULL, PRIMARY KEY (`id`)) ENGINE=InnoDB",
-            "CREATE TABLE IF NOT EXISTS `botsaz` (`id` int(6) UNSIGNED NOT NULL AUTO_INCREMENT, `id_user` varchar(200) NOT NULL, `username` varchar(200) NOT NULL, `name_bot` varchar(200) NOT NULL, `token` varchar(500) NOT NULL, `time_expire` varchar(200) NOT NULL, `status` varchar(200) NOT NULL, PRIMARY KEY (`id`)) ENGINE=InnoDB",
-            "CREATE TABLE IF NOT EXISTS `card_number` (`cardnumber` varchar(500) NOT NULL, `name_card` varchar(1000) NOT NULL, PRIMARY KEY (`cardnumber`)) ENGINE=InnoDB",
-            "CREATE TABLE IF NOT EXISTS `departman` (`id` int(6) UNSIGNED NOT NULL AUTO_INCREMENT, `idsupport` varchar(200) NOT NULL, `name_departman` varchar(600) NOT NULL, PRIMARY KEY (`id`)) ENGINE=InnoDB",
-            "CREATE TABLE IF NOT EXISTS `logs_api` (`id` int(6) UNSIGNED NOT NULL AUTO_INCREMENT, `header` longtext, `data` longtext, `ip` varchar(200) NOT NULL, `time` varchar(200) NOT NULL, `actions` varchar(200) NOT NULL, PRIMARY KEY (`id`)) ENGINE=InnoDB",
-            "CREATE TABLE IF NOT EXISTS `manualsell` (`id` int(6) UNSIGNED NOT NULL AUTO_INCREMENT, `codepanel` varchar(100) NOT NULL, `codeproduct` varchar(100) NOT NULL, `namerecord` varchar(200) NOT NULL, `username` varchar(500) DEFAULT NULL, `contentrecord` text NOT NULL, `status` varchar(200) NOT NULL, PRIMARY KEY (`id`)) ENGINE=InnoDB",
-            "CREATE TABLE IF NOT EXISTS `reagent_report` (`id` int(6) UNSIGNED NOT NULL AUTO_INCREMENT, `user_id` bigint(20) NOT NULL, `get_gift` tinyint(1) NOT NULL, `time` varchar(50) NOT NULL, `reagent` varchar(30) NOT NULL, PRIMARY KEY (`id`), UNIQUE KEY `user_id` (`user_id`)) ENGINE=InnoDB",
-            "CREATE TABLE IF NOT EXISTS `Requestagent` (`id` varchar(500) NOT NULL, `username` varchar(500) NOT NULL, `time` varchar(500) NOT NULL, `Description` varchar(500) NOT NULL, `status` varchar(500) NOT NULL, `type` varchar(500) NOT NULL, PRIMARY KEY (`id`)) ENGINE=InnoDB",
-            "CREATE TABLE IF NOT EXISTS `service_other` (`id` int(6) UNSIGNED NOT NULL AUTO_INCREMENT, `id_user` varchar(500) NOT NULL, `username` varchar(1000) NOT NULL, `value` varchar(1000) NOT NULL, `time` varchar(200) NOT NULL, `price` varchar(200) NOT NULL, `type` varchar(1000) NOT NULL, `status` varchar(200) NOT NULL, `output` text NOT NULL, PRIMARY KEY (`id`)) ENGINE=InnoDB",
-            "CREATE TABLE IF NOT EXISTS `support_message` (`id` int(6) UNSIGNED NOT NULL AUTO_INCREMENT, `Tracking` varchar(100) NOT NULL, `idsupport` varchar(100) NOT NULL, `iduser` varchar(100) NOT NULL, `name_departman` varchar(600) NOT NULL, `text` text NOT NULL, `result` text NOT NULL, `time` varchar(200) NOT NULL, `status` enum('Answered','Pending','Unseen','Customerresponse','close') NOT NULL, PRIMARY KEY (`id`)) ENGINE=InnoDB",
-            "CREATE TABLE IF NOT EXISTS `topicid` (`report` varchar(500) NOT NULL, `idreport` text NOT NULL, PRIMARY KEY (`report`)) ENGINE=InnoDB",
-            "CREATE TABLE IF NOT EXISTS `wheel_list` (`id` int(6) UNSIGNED NOT NULL AUTO_INCREMENT, `id_user` varchar(200) NOT NULL, `time` varchar(200) NOT NULL, `first_name` varchar(200) NOT NULL, `wheel_code` varchar(200) NOT NULL, `price` varchar(200) NOT NULL, PRIMARY KEY (`id`)) ENGINE=InnoDB",
-            "CREATE TABLE IF NOT EXISTS `shopSetting` (`Namevalue` varchar(500) NOT NULL, `value` text NOT NULL, PRIMARY KEY (`Namevalue`)) ENGINE=InnoDB"
-        ];
-
-        foreach ($createTables as $sql) {
-            if ($connect->query($sql)) $tables_count++;
-        }
-
-        $connect->query("INSERT INTO `topicid` VALUES ('backupfile', '0'), ('buyreport', '0'), ('errorreport', '0'), ('otherreport', '0'), ('otherservice', '0'), ('paymentreport', '0'), ('porsantreport', '0'), ('reportcron', '0'), ('reportnight', '0'), ('reporttest', '0') ON DUPLICATE KEY UPDATE idreport=idreport");
-        $connect->query("INSERT INTO `departman` VALUES (1, '$adminNumber', 'پشتیبانی فنی') ON DUPLICATE KEY UPDATE name_departman='پشتیبانی فنی'");
-        $connect->query("INSERT INTO `shopSetting` VALUES ('backserviecstatus', 'on'), ('chashbackextend', '0'), ('configshow', 'onconfig'), ('customtimepricef', '4000'), ('customvolmef', '4000'), ('statuschangeservice', 'onstatus'), ('statusdirectpabuy', 'ondirectbuy'), ('statusextra', 'offextra') ON DUPLICATE KEY UPDATE value=value");
-        $migrationLog[] = "✅ جداول: $tables_count";
-
-        $migrationLog[] = "📋 بخش 4: user";
-        $old_fields = ["ref_code"];
-        foreach ($old_fields as $field) {
-            $check = $connect->query("SHOW COLUMNS FROM `user` LIKE '$field'");
-            if ($check && $check->num_rows > 0) {
-                if ($field == "ref_code") @$connect->query("ALTER TABLE `user` DROP INDEX `ref_code`");
-                @$connect->query("ALTER TABLE `user` DROP COLUMN `$field`");
-            }
-        }
-
-        if (addFieldToTable('user', 'verify', '', 'VARCHAR(100)', $connect)) {
-            $migrationLog[] = "✅ verify";
-        }
-
-        $user_fields = 0;
-        $addUserFields = [
-            ['agent', '0', 'VARCHAR(100)'],
-            ['namecustom', '', 'VARCHAR(300)'],
-            ['number_username', '', 'VARCHAR(300)'],
-            ['register', '', 'VARCHAR(100)'],
-            ['cardpayment', '', 'VARCHAR(100)'],
-            ['codeInvitation', null, 'VARCHAR(100)'],
-            ['pricediscount', '0', 'VARCHAR(100)'],
-            ['hide_mini_app_instruction', '0', 'VARCHAR(20)'],
-            ['maxbuyagent', '0', 'VARCHAR(100)'],
-            ['joinchannel', '0', 'VARCHAR(100)'],
-            ['checkstatus', '0', 'VARCHAR(50)'],
-            ['bottype', null, 'TEXT'],
-            ['score', '0', 'INT(255)'],
-            ['limitchangeloc', '0', 'VARCHAR(50)'],
-            ['status_cron', '1', 'VARCHAR(20)'],
-            ['expire', null, 'VARCHAR(100)'],
-            ['token', null, 'VARCHAR(100)']
-        ];
-
-        foreach ($addUserFields as $field) {
-            if (addFieldToTable('user', $field[0], $field[1] ?? null, $field[2] ?? 'VARCHAR(100)', $connect)) $user_fields++;
-        }
-        $migrationLog[] = "✅ فیلدها: $user_fields";
-
-        $migrationLog[] = "📋 بخش 5: textbot";
-        $texts = [
-            ['text_extend', '♻️ تمدید سرویس'],
-            ['text_wheel_luck', '🎲 گردونه شانس']
-        ];
-        $texts_count = 0;
-        foreach ($texts as $text) {
-            if (@$connect->query("INSERT INTO `textbot` VALUES ('{$text[0]}', '{$text[1]}') ON DUPLICATE KEY UPDATE text='{$text[1]}'")) $texts_count++;
-        }
-        $migrationLog[] = "✅ متن‌ها: $texts_count";
-
-        $migrationLog[] = "📋 بخش 6: تبدیل Category در product";
+        $migrationLog[] = "📋 بخش 6: تبدیل Category در product (خاص migration)";
         try {
             $check_category = $connect->query("SHOW TABLES LIKE 'category'");
             $check_product = $connect->query("SHOW TABLES LIKE 'product'");
@@ -705,8 +493,7 @@ function runCompleteMigration($dbInfo, $adminNumber, &$migrationLog) {
         } catch (Exception $e) {
             $migrationLog[] = "⚠️ خطا در تبدیل Category: " . $e->getMessage();
         }
-
-        $migrationLog[] = "📋 بخش 7: admin";
+        $migrationLog[] = "📋 بخش 7: admin (خاص migration)";
         $check_admin = $connect->query("SHOW TABLES LIKE 'admin'");
         if ($check_admin && $check_admin->num_rows > 0) {
             $count = $connect->query("SELECT COUNT(*) as cnt FROM admin")->fetch_assoc()['cnt'];
@@ -729,7 +516,7 @@ function runCompleteMigration($dbInfo, $adminNumber, &$migrationLog) {
             $connect->query("INSERT INTO `admin` (`id_admin`, `username`, `password`, `rule`) VALUES ('$adminNumber', 'admin', '14e9eab674', 'administrator')");
             $migrationLog[] = "✅ ایجاد جدول admin";
         }
-
+        $migrationLog[] = "📋 اجرای table.php برای سازگاری کامل (جداول عمومی و fixes)";
         $connect->close();
         return true;
     } catch (Exception $e) {
@@ -737,12 +524,9 @@ function runCompleteMigration($dbInfo, $adminNumber, &$migrationLog) {
         return false;
     }
 }
-
-
 if (isset($uPOST['submit']) && $uPOST['submit']) {
     $ERROR = [];
     $SUCCESS[] = "✅ ربات با موفقیت نصب شد !";
-
     $rawConfigData = file_get_contents($configDirectory);
     $tgAdminId = $uPOST['admin_id'];
     $tgBotToken = $uPOST['tg_bot_token'];
@@ -752,27 +536,22 @@ if (isset($uPOST['submit']) && $uPOST['submit']) {
     $dbInfo['password'] = $uPOST['database_password'];
     $inputUrl = $uPOST['bot_address_webhook'] ?? $webAddress . '/index.php';
     $document = normalizeDomainAddress($inputUrl);
-
     if ($document === null) {
         $ERROR[] = 'آدرس ارائه شده برای ربات نامعتبر است.';
     }
-
     if (!isHttps()) {
         $ERROR[] = 'برای فعال سازی ربات تلگرام نیازمند فعال بودن SSL (https) هستید';
         $ERROR[] = '<i>اگر از فعال بودن SSL مطمئن هستید، سرور پشت proxy/CDN (مثل Cloudflare) است – headers را در cPanel چک کنید یا با https مستقیم باز کنید.</i>';
         $sslLink = 'https://' . $_SERVER['HTTP_HOST'] . $_SERVER['SCRIPT_NAME'];
         $ERROR[] = '<a href="' . $sslLink . '">' . $sslLink . '</a>';
     }
-
     $isValidToken = isValidTelegramToken($tgBotToken);
     if (!$isValidToken) {
         $ERROR[] = "توکن ربات صحیح نمی باشد.";
     }
-
     if (!isValidTelegramId($tgAdminId)) {
         $ERROR[] = "آیدی عددی ادمین نامعتبر است.";
     }
-
     if ($isValidToken) {
         $tgBot['details'] = getContents("https://api.telegram.org/bot" . $tgBotToken . "/getMe");
         if ($tgBot['details']['ok'] == false) {
@@ -786,7 +565,6 @@ if (isset($uPOST['submit']) && $uPOST['submit']) {
             }
         }
     }
-
     try {
         $dsn = "mysql:host=" . $dbInfo['host'] . ";dbname=" . $dbInfo['name'] . ";charset=utf8mb4";
         $pdo = new PDO($dsn, $dbInfo['username'], $dbInfo['password']);
@@ -796,15 +574,13 @@ if (isset($uPOST['submit']) && $uPOST['submit']) {
         $ERROR[] = "اطلاعات ورودی را بررسی کنید.";
         $ERROR[] = "<code>" . $e->getMessage() . "</code>";
     }
-
-    
+   
     if ($installType == 'migrate_free_to_pro' && $hasDbBackup == 'no' && empty($ERROR)) {
         $importSuccess = handleDatabaseImport($dbInfo, $ERROR);
         if ($importSuccess) {
             $SUCCESS[] = "✅ بکاپ دیتابیس با موفقیت ایمپورت شد!";
         }
     }
-
     if (empty($ERROR)) {
         $replacements = [
             '{database_name}' => $dbInfo['name'],
@@ -815,18 +591,15 @@ if (isset($uPOST['submit']) && $uPOST['submit']) {
             '{domain_name}' => $document['address'],
             '{username_bot}' => $tgBot['details']['result']['username']
         ];
-
         $replacementCount = 0;
         $newConfigData = updateConfigValues($rawConfigData, $replacements, $replacementCount);
-
         if ($replacementCount === 0 || file_put_contents($configDirectory, $newConfigData) === false) {
             $ERROR[] = '✏️❌ خطا در زمان بازنویسی اطلاعات فایل اصلی ربات';
             $ERROR[] = "فایل های پروژه را مجددا دانلود و بارگذاری کنید (<a href='https://github.com/mahdiMGF2/mirza_pro'>‎🌐 Github</a>)";
         } else {
             $tableResult = getContents("https://" . $document['address'] . "/table.php");
             $SUCCESS[] = "✅ جداول دیتابیس ایجاد/بروزرسانی شد";
-
-            
+           
             if (needsMigration($installType)) {
                 $migrationLog = [];
                 $migrationResult = runCompleteMigration($dbInfo, $tgAdminId, $migrationLog);
@@ -835,21 +608,19 @@ if (isset($uPOST['submit']) && $uPOST['submit']) {
                     foreach ($migrationLog as $log) {
                         $SUCCESS[] = $log;
                     }
+                    getContents("https://" . $document['address'] . "/table.php");
+                    $SUCCESS[] = "✅ fixes سازگاری table.php اعمال شد";
                 }
             }
-
             getContents("https://api.telegram.org/bot" . $tgBotToken . "/setwebhook?url=https://" . $document['address'] . '/index.php');
             $SUCCESS[] = "✅ Webhook تنظیم شد";
-
             $botFirstMessage = "\n[🤖] شما به عنوان ادمین معرفی شدید.";
             getContents('https://api.telegram.org/bot' . $tgBotToken . '/sendMessage?chat_id=' . $tgAdminId . '&text=' . urlencode(' ' . $SUCCESS[0] . $botFirstMessage) . '&reply_markup={"inline_keyboard":[[{"text":"⚙️ شروع ربات ","callback_data":"start"}]]}');
-
             $success = true;
         }
     }
 }
 ?>
-
 <!DOCTYPE html>
 <html dir="rtl" lang="fa">
 <head>
@@ -1125,7 +896,6 @@ if (isset($uPOST['submit']) && $uPOST['submit']) {
     </script>
 </body>
 </html>
-
 <?php
 function getContents($url) {
     $context = stream_context_create([
@@ -1142,15 +912,12 @@ function getContents($url) {
     }
     return $decoded;
 }
-
 function isValidTelegramToken($token) {
     return preg_match('/^\d{6,12}:[A-Za-z0-9_-]{35}$/', $token);
 }
-
 function isValidTelegramId($id) {
     return preg_match('/^\d{6,12}$/', $id);
 }
-
 function sanitizeInput(&$INPUT, array $options = []) {
     $defaultOptions = [
         'allow_html' => false,
@@ -1161,41 +928,32 @@ function sanitizeInput(&$INPUT, array $options = []) {
         'encoding' => 'UTF-8'
     ];
     $options = array_merge($defaultOptions, $options);
-
     if (is_array($INPUT)) {
         return array_map(function($item) use ($options) {
             return sanitizeInput($item, $options);
         }, $INPUT);
     }
-
     if ($INPUT === null || $INPUT === false) {
         return '';
     }
-
     $INPUT = trim((string)$INPUT);
     $INPUT = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $INPUT);
-
     if ($options['max_length'] > 0) {
         $INPUT = mb_substr($INPUT, 0, $options['max_length'], $options['encoding']);
     }
-
     if (!$options['allow_html']) {
         $INPUT = strip_tags($INPUT);
     } elseif (!empty($options['allowed_tags'])) {
         $INPUT = strip_tags($INPUT, $options['allowed_tags']);
     }
-
     if ($options['remove_spaces']) {
         $INPUT = preg_replace('/\s+/', ' ', trim($INPUT));
     }
-
     if ($options['connection'] instanceof mysqli) {
         $INPUT = $options['connection']->real_escape_string($INPUT);
     }
-
     return $INPUT;
 }
-
 function normalizeDomainAddress($url) {
     $url = trim((string) $url);
     if ($url === '') {
@@ -1221,7 +979,6 @@ function normalizeDomainAddress($url) {
         'address' => $address
     ];
 }
-
 function updateConfigValues($configContents, array $placeholderValues, &$replacementCount = 0) {
     $replacementCount = 0;
     $configData = str_replace(array_keys($placeholderValues), array_values($placeholderValues), $configContents, $placeholderReplacementCount);
@@ -1254,11 +1011,9 @@ function updateConfigValues($configContents, array $placeholderValues, &$replace
     }
     return $updatedConfig;
 }
-
 function escapeHtml($value) {
     return htmlspecialchars((string) $value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 }
-
 function formatConfigValue($value, $quoteChar = '\'') {
     if ($value === null) {
         return 'null';
