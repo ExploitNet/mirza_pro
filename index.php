@@ -7297,6 +7297,17 @@ if (isset($update['pre_checkout_query'])) {
         return;
     }
     update("Payment_report", "dec_not_confirmed", json_encode($update['pre_checkout_query']), "id_order", $Payment_report['id_order']);
+}
+if (isset($update['message']['successful_payment'])) {
+    $id_order = $update['message']['successful_payment']['invoice_payload'];
+    $Payment_report = select("Payment_report", "*", "id_order", $id_order, "select");
+    if ($Payment_report == false) {
+        return;
+    }
+    if ($Payment_report['payment_Status'] == "paid") {
+        return;
+    }
+    update("Payment_report", "dec_not_confirmed", $Payment_report['dec_not_confirmed'] . json_encode($update['message']['successful_payment']), "id_order", $Payment_report['id_order']);
     DirectPayment($Payment_report['id_order']);
     $pricecashback = select("PaySetting", "ValuePay", "NamePay", "chashbackstar", "select")['ValuePay'];
     $Balance_id = select("user", "*", "id", $Payment_report['id_user'], "select");
@@ -7316,7 +7327,7 @@ if (isset($update['pre_checkout_query'])) {
         ]);
     }
     update("Payment_report", "payment_Status", "paid", "id_order", $Payment_report['id_order']);
-} elseif (preg_match('/extends_(\w+)_(.*)/', $datain, $dataget)) {
+}elseif (preg_match('/extends_(\w+)_(.*)/', $datain, $dataget)) {
     $username = $dataget[1];
     $location = select("marzban_panel", "*", "code_panel", $user['Processing_value_four'], "select");
     if ($location == false) {
