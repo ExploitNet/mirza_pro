@@ -6,9 +6,6 @@ $query = $pdo->prepare("SELECT * FROM admin WHERE username=:username");
 $query->bindParam("username", $_SESSION["user"], PDO::PARAM_STR);
 $query->execute();
 $result = $query->fetch(PDO::FETCH_ASSOC);
-$query = $pdo->prepare("SELECT * FROM x_ui");
-$query->execute();
-$resultpanel = $query->fetchAll();
 if( !isset($_SESSION["user"]) || !$result ){
     header('Location: login.php');
     return;

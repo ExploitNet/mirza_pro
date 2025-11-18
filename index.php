@@ -3885,7 +3885,6 @@ $textinvite
         savedata('clear', "nameconfig", $text);
         step("home", $from_id);
     }
-    error_log($text);
     if ($datain == "buy" || $datain == "buybacktow" || $datain == "buyback") {
         Editmessagetext($from_id, $message_id, $datatextbot['textselectlocation'], $list_marzban_panel_user);
     } else {
