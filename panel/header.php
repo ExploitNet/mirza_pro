@@ -80,27 +80,11 @@
                       </a>
                   </li> 
                   <li>
-                      <a href="seeting_x_ui.php">
-                          <i class="icon-sun"></i>
-                          <span>تنظیمات پروتکل x-ui</span>
-                      </a>
-                  </li>
-                  <li>
                       <a href="keyboard.php">
                           <i class="icon-sort-by-alphabet-alt"></i>
                           <span>چیدمان کیبورد</span>
                       </a>
                   </li>
-                  <!--<li class="sub-menu">-->
-                  <!--    <a href="javascript:;" class="">-->
-                  <!--        <i class="icon-user"></i>-->
-                  <!--        <span>کاربران</span>-->
-                  <!--        <span class="arrow"></span>-->
-                  <!--    </a>-->
-                  <!--    <ul class="sub">-->
-                  <!--        <li><a class="" href="users.php">لیست کاربران</a></li>-->
-                  <!--    </ul>-->
-                  <!--</li>-->
               </ul>
               <!-- sidebar menu end-->
           </div>

@@ -2170,12 +2170,3 @@ class ManagePanel
         return $extra_time;
     }
 }
-// $ManagePanel = new ManagePanel();
-// $datac = array(
-//         'desc' => 'mahdi12211',
-//     );
-// // $DataUserOut = $ManagePanel->createUser("test2","usertest","mahdi1221",$datac);
-// // // $DataUserOut = $ManagePanel->RemoveUser("alireza","4b090d1f0d19");
-// $DataUserOut = $ManagePanel->Modifyuser("mahdi12211","test2",$datac);
-// // $DataUserOut = $ManagePanel->Revoke_sub("iran","ddddd");
-// var_dump($DataUserOut);
