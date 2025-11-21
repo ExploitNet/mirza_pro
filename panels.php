@@ -5,7 +5,6 @@ require_once __DIR__ . '/Marzban.php';
 require_once __DIR__ . '/function.php';
 require_once __DIR__ . '/x-ui_single.php';
 require_once __DIR__ . '/hiddify.php';
-require_once __DIR__ . '/alireza.php';
 require_once __DIR__ . '/marzneshin.php';
 require_once __DIR__ . '/alireza_single.php';
 require_once __DIR__ . '/WGDashboard.php';
