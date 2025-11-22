@@ -65,8 +65,8 @@ self_update_script
 # Check SSL certificate status and days remaining
 check_ssl_status() {
     # First get domain from config file
-    if [ -f "/var/www/html/mirzabotconfig/config.php" ]; then
-        domain=$(grep '^\$domainhosts' "/var/www/html/mirzabotconfig/config.php" | cut -d"'" -f2 | cut -d'/' -f1)
+    if [ -f "/var/www/html/mirzaprobotconfig/config.php" ]; then
+        domain=$(grep '^\$domainhosts' "/var/www/html/mirzaprobotconfig/config.php" | cut -d"'" -f2 | cut -d'/' -f1)
 
         if [ -n "$domain" ] && [ -f "/etc/letsencrypt/live/$domain/cert.pem" ]; then
             expiry_date=$(openssl x509 -enddate -noout -in "/etc/letsencrypt/live/$domain/cert.pem" | cut -d= -f2)
@@ -88,7 +88,7 @@ check_ssl_status() {
 
 # Check bot installation status
 check_bot_status() {
-    if [ -f "/var/www/html/mirzabotconfig/config.php" ]; then
+    if [ -f "/var/www/html/mirzaprobotconfig/config.php" ]; then
         echo -e "\033[32m✅ Bot is installed\033[0m"
         check_ssl_status
     else
@@ -112,9 +112,13 @@ function show_logo() {
     echo "================================================================================="
     echo -e "\033[0m"
     echo ""
-    echo -e "\033[1;36mVersion:\033[0m \033[33m0.1 (Pro)\033[0m"
-    echo -e "\033[1;36mTelegram Channel:\033[0m \033[34mhttps://t.me/mirzapanel\033[0m"
-    echo -e "\033[1;36mTelegram Group:  \033[0m \033[34mhttps://t.me/mirzapanelgroup\033[0m"
+    echo -e "\033[1;36m+-------------------+---------------------------------------------------+\033[0m"
+    echo -e "\033[1;36m| Version           |\033[0m \033[33m0.3 (Pro)\033[0m"
+    echo -e "\033[1;36m+-------------------+---------------------------------------------------+\033[0m"
+    echo -e "\033[1;36m| Telegram Channel  |\033[0m \033[34mhttps://t.me/mirzapanel\033[0m"
+    echo -e "\033[1;36m+-------------------+---------------------------------------------------+\033[0m"
+    echo -e "\033[1;36m| Telegram Group    |\033[0m \033[34mhttps://t.me/mirzapanelgroup\033[0m"
+    echo -e "\033[1;36m+-------------------+---------------------------------------------------+\033[0m"
     echo ""
     echo -e "\033[1;36mInstallation Status:\033[0m"
     check_bot_status
@@ -125,9 +129,9 @@ function show_logo() {
 # Display Menu
 function show_menu() {
     show_logo
-    echo -e "\033[1;36m1)\033[0m Install Mirza Bot"
-    # echo -e "\033[1;36m2)\033[0m Update Mirza Bot"
-    # echo -e "\033[1;36m3)\033[0m Remove Mirza Bot"
+    echo -e "\033[1;36m1)\033[0m Install MirzaPro Bot"
+    echo -e "\033[1;36m2)\033[0m Update MirzaPro Bot"
+    echo -e "\033[1;36m3)\033[0m Remove MirzaPro Bot"
     # echo -e "\033[1;36m4)\033[0m Export Database"
     # echo -e "\033[1;36m5)\033[0m Import Database"
     # echo -e "\033[1;36m6)\033[0m Configure Automated Backup"
@@ -139,8 +143,8 @@ function show_menu() {
     read -p "Select an option [1-10]: " option
     case $option in
         1) install_bot ;;
-        # 2) update_bot ;;
-        # 3) remove_bot ;;
+        2) update_bot ;;
+        3) remove_bot ;;
         # 4) export_database ;;
         # 5) import_database ;;
         # 6) auto_backup ;;
@@ -1328,226 +1332,230 @@ EOF
 #     ln -vs /root/install.sh /usr/local/bin/mirza
 # }
 
-# Update Function
-# function update_bot() {
-#     echo "Updating Mirza Bot..."
+# Update Function for Mirza Pro
+function update_bot() {
+    echo "Updating Mirza Pro Bot..."
 
-#     # Update server packages
-#     if ! sudo apt update && sudo apt upgrade -y; then
-#         echo -e "\e[91mError updating the server. Exiting...\033[0m"
-#         exit 1
-#     fi
-#     echo -e "\e[92mServer packages updated successfully...\033[0m\n"
+    # Update server packages
+    if ! sudo apt update && sudo apt upgrade -y; then
+        echo -e "\e[91mError updating the server. Exiting...\033[0m"
+        exit 1
+    fi
+    echo -e "\e[92mServer packages updated successfully...\033[0m\n"
 
-#     # Check if bot is already installed
-#     BOT_DIR="/var/www/html/mirzabotconfig"
-#     if [ ! -d "$BOT_DIR" ]; then
-#         echo -e "\e[91mError: Mirza Bot is not installed. Please install it first.\033[0m"
-#         exit 1
-#     fi
+    # Check if bot is already installed (Pro Directory)
+    BOT_DIR="/var/www/html/mirzaprobotconfig"
+    if [ ! -d "$BOT_DIR" ]; then
+        echo -e "\e[91mError: Mirza Pro Bot is not installed. Please install it first.\033[0m"
+        exit 1
+    fi
 
-#     # Fetch latest release from GitHub
-#     # Check for version flag
-#     if [[ "$1" == "-beta" ]] || [[ "$1" == "-v" && "$2" == "beta" ]]; then
-#         ZIP_URL="https://github.com/mahdiMGF2/botmirzapanel/archive/refs/heads/main.zip"
-#     else
-#         ZIP_URL=$(curl -s https://api.github.com/repos/mahdiMGF2/botmirzapanel/releases/latest | grep "zipball_url" | cut -d '"' -f4)
-#     fi
+    # Fetch latest version from GitHub (Always Main Branch for Pro)
+    ZIP_URL="https://github.com/mahdiMGF2/mirza_pro/archive/refs/heads/main.zip"
 
-#     # Create temporary directory
-#     TEMP_DIR="/tmp/mirzabot_update"
-#     mkdir -p "$TEMP_DIR"
+    # Create temporary directory
+    TEMP_DIR="/tmp/mirzaprobot_update"
+    mkdir -p "$TEMP_DIR"
 
-#     # Download and extract
-#     wget -O "$TEMP_DIR/bot.zip" "$ZIP_URL" || {
-#         echo -e "\e[91mError: Failed to download update package.\033[0m"
-#         exit 1
-#     }
-#     unzip "$TEMP_DIR/bot.zip" -d "$TEMP_DIR"
+    # Download and extract
+    echo -e "\e[33mDownloading latest version...\033[0m"
+    wget -q -O "$TEMP_DIR/bot.zip" "$ZIP_URL" || {
+        echo -e "\e[91mError: Failed to download update package.\033[0m"
+        exit 1
+    }
+    unzip -q "$TEMP_DIR/bot.zip" -d "$TEMP_DIR"
 
-#     # Find extracted directory
-#     EXTRACTED_DIR=$(find "$TEMP_DIR" -mindepth 1 -maxdepth 1 -type d)
+    # Find extracted directory (usually mirza_pro-main)
+    EXTRACTED_DIR=$(find "$TEMP_DIR" -mindepth 1 -maxdepth 1 -type d)
 
-#     # Backup config file
-#     CONFIG_PATH="/var/www/html/mirzabotconfig/config.php"
-#     TEMP_CONFIG="/root/mirza_config_backup.php"
-#     if [ -f "$CONFIG_PATH" ]; then
-#         cp "$CONFIG_PATH" "$TEMP_CONFIG" || {
-#             echo -e "\e[91mConfig file backup failed!\033[0m"
-#             exit 1
-#         }
-#     fi
+    # Backup config file
+    CONFIG_PATH="$BOT_DIR/config.php"
+    TEMP_CONFIG="/root/mirzapro_config_backup.php"
+    if [ -f "$CONFIG_PATH" ]; then
+        cp "$CONFIG_PATH" "$TEMP_CONFIG" || {
+            echo -e "\e[91mConfig file backup failed!\033[0m"
+            exit 1
+        }
+    else
+        echo -e "\e[93mWarning: config.php not found. Proceeding without backup.\033[0m"
+    fi
 
-#     # Remove old version
-#     sudo rm -rf /var/www/html/mirzabotconfig || {
-#         echo -e "\e[91mFailed to remove old bot files!\033[0m"
-#         exit 1
-#     }
+    # Remove old version
+    sudo rm -rf "$BOT_DIR" || {
+        echo -e "\e[91mFailed to remove old bot files!\033[0m"
+        exit 1
+    }
 
-#     # Move new files
-#     sudo mkdir -p /var/www/html/mirzabotconfig
-#     sudo mv "$EXTRACTED_DIR"/* /var/www/html/mirzabotconfig/ || {
-#         echo -e "\e[91mFile transfer failed!\033[0m"
-#         exit 1
-#     }
+    # Move new files
+    sudo mkdir -p "$BOT_DIR"
+    sudo mv "$EXTRACTED_DIR"/* "$BOT_DIR/" || {
+        echo -e "\e[91mFile transfer failed!\033[0m"
+        exit 1
+    }
 
-#     # Restore config file
-#     if [ -f "$TEMP_CONFIG" ]; then
-#         sudo mv "$TEMP_CONFIG" "$CONFIG_PATH" || {
-#             echo -e "\e[91mConfig file restore failed!\033[0m"
-#             exit 1
-#         }
-#     fi
+    # Restore config file
+    if [ -f "$TEMP_CONFIG" ]; then
+        sudo mv "$TEMP_CONFIG" "$CONFIG_PATH" || {
+            echo -e "\e[91mConfig file restore failed!\033[0m"
+            exit 1
+        }
+    fi
 
-#     # Copy the new install.sh to /root/
-#     if [ -f "/var/www/html/mirzabotconfig/install.sh" ]; then
-#         sudo cp /var/www/html/mirzabotconfig/install.sh /root/install.sh
-#         echo -e "\n\e[92mCopied latest install.sh to /root/install.sh.\033[0m"
-#     else
-#         echo -e "\n\e[91mWarning: install.sh not found in /var/www/html/mirzabotconfig/ after update. Cannot update /root/install.sh.\033[0m"
-#     fi
+    # Copy the new install.sh to /root/ to ensure script self-update works next time
+    if [ -f "$BOT_DIR/install.sh" ]; then
+        sudo cp "$BOT_DIR/install.sh" /root/install.sh
+        echo -e "\n\e[92mCopied latest install.sh to /root/install.sh.\033[0m"
+    else
+        echo -e "\n\e[91mWarning: install.sh not found in update files.\033[0m"
+    fi
 
-#     # Set permissions
-#     sudo chown -R www-data:www-data /var/www/html/mirzabotconfig/
-#     sudo chmod -R 755 /var/www/html/mirzabotconfig/
+    # Set permissions
+    sudo chown -R www-data:www-data "$BOT_DIR"
+    sudo chmod -R 755 "$BOT_DIR"
 
-#     # Run setup script
-#     URL=$(grep '\$domainhosts' "$CONFIG_PATH" | cut -d"'" -f2)
-#     curl -s "https://$URL/table.php" || {
-#         echo -e "\e[91mSetup script execution failed!\033[0m"
-#     }
+    # Run setup script (table.php) to apply any DB changes
+    # Extracting the domain/path from the new config structure
+    if [ -f "$CONFIG_PATH" ]; then
+        URL_PATH=$(grep "^\$domainhosts" "$CONFIG_PATH" | cut -d"'" -f2)
+        if [ -n "$URL_PATH" ]; then
+            echo -e "\e[33mUpdating database tables...\033[0m"
+            curl -s "https://$URL_PATH/table.php" > /dev/null || {
+                echo -e "\e[91mSetup script execution failed! Check logs.\033[0m"
+            }
+        fi
+    fi
 
-#     # Cleanup
-#     rm -rf "$TEMP_DIR"
+    # Cleanup
+    rm -rf "$TEMP_DIR"
 
-#     echo -e "\n\e[92mMirza Bot updated to latest version successfully!\033[0m"
+    echo -e "\n\e[92mMirza Pro Bot updated to latest version successfully!\033[0m"
 
-#     # Ensure /root/install.sh is executable and linked
-#     if [ -f "/root/install.sh" ]; then
-#         sudo chmod +x /root/install.sh
-#         sudo ln -vsf /root/install.sh /usr/local/bin/mirza
-#         echo -e "\e[92mEnsured /root/install.sh is executable and 'mirza' command is linked.\033[0m"
-#     else
-#         echo -e "\e[91mError: /root/install.sh not found after update attempt. Cannot make it executable or link 'mirza' command.\033[0m"
-#     fi
-# }
+    # Ensure /root/install.sh is executable and linked to mirzapro
+    if [ -f "/root/install.sh" ]; then
+        sudo chmod +x /root/install.sh
+        sudo ln -sf /root/install.sh /usr/local/bin/mirzapro
+        echo -e "\e[92mEnsured /root/install.sh is executable and 'mirzapro' command is linked.\033[0m"
+    else
+        echo -e "\e[91mError: /root/install.sh not found after update attempt.\033[0m"
+    fi
+}
 
-# Delete Function
-# function remove_bot() {
-#     echo -e "\e[33mStarting Mirza Bot removal process...\033[0m"
-#     LOG_FILE="/var/log/remove_bot.log"
-#     echo "Log file: $LOG_FILE" > "$LOG_FILE"
+# Delete Function for Mirza Pro
+function remove_bot() {
+    echo -e "\e[33mStarting Mirza Pro Bot removal process...\033[0m"
+    LOG_FILE="/var/log/remove_bot.log"
+    echo "Log file: $LOG_FILE" > "$LOG_FILE"
 
-#     # Check if Mirza Bot is installed
-#     BOT_DIR="/var/www/html/mirzabotconfig"
-#     if [ ! -d "$BOT_DIR" ]; then
-#         echo -e "\e[31m[ERROR]\033[0m Mirza Bot is not installed (/var/www/html/mirzabotconfig not found)." | tee -a "$LOG_FILE"
-#         echo -e "\e[33mNothing to remove. Exiting...\033[0m" | tee -a "$LOG_FILE"
-#         sleep 2
-#         exit 1
-#     fi
+    # Check if Mirza Pro Bot is installed
+    BOT_DIR="/var/www/html/mirzaprobotconfig"
+    if [ ! -d "$BOT_DIR" ]; then
+        echo -e "\e[31m[ERROR]\033[0m Mirza Pro Bot is not installed (/var/www/html/mirzaprobotconfig not found)." | tee -a "$LOG_FILE"
+        echo -e "\e[33mNothing to remove. Exiting...\033[0m" | tee -a "$LOG_FILE"
+        sleep 2
+        exit 1
+    fi
 
-#     # User Confirmation
-#     read -p "Are you sure you want to remove Mirza Bot and its dependencies? (y/n): " choice
-#     if [[ "$choice" != "y" ]]; then
-#         echo "Aborting..." | tee -a "$LOG_FILE"
-#         exit 0
-#     fi
+    # User Confirmation
+    read -p "Are you sure you want to remove Mirza Pro Bot and its dependencies? (y/n): " choice
+    if [[ "$choice" != "y" ]]; then
+        echo "Aborting..." | tee -a "$LOG_FILE"
+        exit 0
+    fi
 
-#     # Check if Marzban is installed and redirect to appropriate function
-#     if check_marzban_installed; then
-#         echo -e "\e[41m[IMPORTANT NOTICE]\033[0m \e[33mMarzban detected. Proceeding with Marzban-compatible removal.\033[0m" | tee -a "$LOG_FILE"
-#         remove_bot_with_marzban
-#         return 0
-#     fi
+    # Check if Marzban is installed and redirect to appropriate function
+    if check_marzban_installed; then
+        echo -e "\e[41m[IMPORTANT NOTICE]\033[0m \e[33mMarzban detected. Proceeding with Marzban-compatible removal.\033[0m" | tee -a "$LOG_FILE"
+        remove_bot_with_marzban
+        return 0
+    fi
 
-#     # Proceed with normal removal if Marzban is not installed
-#     echo "Removing Mirza Bot..." | tee -a "$LOG_FILE"
+    # Proceed with normal removal if Marzban is not installed
+    echo "Removing Mirza Pro Bot..." | tee -a "$LOG_FILE"
 
-#     # Delete the Bot Directory
-#     if [ -d "$BOT_DIR" ]; then
-#         sudo rm -rf "$BOT_DIR" && echo -e "\e[92mBot directory removed: $BOT_DIR\033[0m" | tee -a "$LOG_FILE" || {
-#             echo -e "\e[91mFailed to remove bot directory: $BOT_DIR. Exiting...\033[0m" | tee -a "$LOG_FILE"
-#             exit 1
-#         }
-#     fi
+    # Delete Configuration File securely before removing directory
+    CONFIG_PATH="/var/www/html/mirzaprobotconfig/config.php"
+    if [ -f "$CONFIG_PATH" ]; then
+        sudo shred -u -n 5 "$CONFIG_PATH" && echo -e "\e[92mConfig file securely removed: $CONFIG_PATH\033[0m" | tee -a "$LOG_FILE" || {
+            echo -e "\e[91mFailed to securely remove config file: $CONFIG_PATH\033[0m" | tee -a "$LOG_FILE"
+        }
+    fi
 
-#     # Delete Configuration File
-#     CONFIG_PATH="/root/config.php"
-#     if [ -f "$CONFIG_PATH" ]; then
-#         sudo shred -u -n 5 "$CONFIG_PATH" && echo -e "\e[92mConfig file securely removed: $CONFIG_PATH\033[0m" | tee -a "$LOG_FILE" || {
-#             echo -e "\e[91mFailed to securely remove config file: $CONFIG_PATH\033[0m" | tee -a "$LOG_FILE"
-#         }
-#     fi
+    # Delete the Bot Directory
+    if [ -d "$BOT_DIR" ]; then
+        sudo rm -rf "$BOT_DIR" && echo -e "\e[92mBot directory removed: $BOT_DIR\033[0m" | tee -a "$LOG_FILE" || {
+            echo -e "\e[91mFailed to remove bot directory: $BOT_DIR. Exiting...\033[0m" | tee -a "$LOG_FILE"
+            exit 1
+        }
+    fi
 
-#     # Delete MySQL and Database Data
-#     echo -e "\e[33mRemoving MySQL and database...\033[0m" | tee -a "$LOG_FILE"
-#     sudo systemctl stop mysql
-#     sudo systemctl disable mysql
-#     sudo systemctl daemon-reload
+    # Delete MySQL and Database Data
+    echo -e "\e[33mRemoving MySQL and database...\033[0m" | tee -a "$LOG_FILE"
+    sudo systemctl stop mysql
+    sudo systemctl disable mysql
+    sudo systemctl daemon-reload
 
-#     sudo apt --fix-broken install -y
+    sudo apt --fix-broken install -y
 
-#     sudo apt-get purge -y mysql-server mysql-client mysql-common mysql-server-core-* mysql-client-core-*
-#     sudo rm -rf /etc/mysql /var/lib/mysql /var/log/mysql /var/log/mysql.* /usr/lib/mysql /usr/include/mysql /usr/share/mysql
-#     sudo rm /lib/systemd/system/mysql.service
-#     sudo rm /etc/init.d/mysql
+    sudo apt-get purge -y mysql-server mysql-client mysql-common mysql-server-core-* mysql-client-core-*
+    sudo rm -rf /etc/mysql /var/lib/mysql /var/log/mysql /var/log/mysql.* /usr/lib/mysql /usr/include/mysql /usr/share/mysql
+    sudo rm /lib/systemd/system/mysql.service
+    sudo rm /etc/init.d/mysql
 
-#     sudo dpkg --remove --force-remove-reinstreq mysql-server mysql-server-8.0
+    sudo dpkg --remove --force-remove-reinstreq mysql-server mysql-server-8.0
 
-#     sudo find /etc/systemd /lib/systemd /usr/lib/systemd -name "*mysql*" -exec rm -f {} \;
+    sudo find /etc/systemd /lib/systemd /usr/lib/systemd -name "*mysql*" -exec rm -f {} \;
 
-#     sudo apt-get purge -y mysql-server mysql-server-8.0 mysql-client mysql-client-8.0
-#     sudo apt-get purge -y mysql-client-core-8.0 mysql-server-core-8.0 mysql-common php-mysql php8.2-mysql php8.3-mysql php-mariadb-mysql-kbs
+    sudo apt-get purge -y mysql-server mysql-server-8.0 mysql-client mysql-client-8.0
+    sudo apt-get purge -y mysql-client-core-8.0 mysql-server-core-8.0 mysql-common php-mysql php8.2-mysql php8.3-mysql php-mariadb-mysql-kbs
 
-#     sudo apt-get autoremove --purge -y
-#     sudo apt-get clean
-#     sudo apt-get update
+    sudo apt-get autoremove --purge -y
+    sudo apt-get clean
+    sudo apt-get update
 
-#     echo -e "\e[92mMySQL has been completely removed.\033[0m" | tee -a "$LOG_FILE"
+    echo -e "\e[92mMySQL has been completely removed.\033[0m" | tee -a "$LOG_FILE"
 
-#     # Delete PHPMyAdmin
-#     echo -e "\e[33mRemoving PHPMyAdmin...\033[0m" | tee -a "$LOG_FILE"
-#     if dpkg -s phpmyadmin &>/dev/null; then
-#         sudo apt-get purge -y phpmyadmin && echo -e "\e[92mPHPMyAdmin removed.\033[0m" | tee -a "$LOG_FILE"
-#         sudo apt-get autoremove -y && sudo apt-get autoclean -y
-#     else
-#         echo -e "\e[93mPHPMyAdmin is not installed.\033[0m" | tee -a "$LOG_FILE"
-#     fi
+    # Delete PHPMyAdmin
+    echo -e "\e[33mRemoving PHPMyAdmin...\033[0m" | tee -a "$LOG_FILE"
+    if dpkg -s phpmyadmin &>/dev/null; then
+        sudo apt-get purge -y phpmyadmin && echo -e "\e[92mPHPMyAdmin removed.\033[0m" | tee -a "$LOG_FILE"
+        sudo apt-get autoremove -y && sudo apt-get autoclean -y
+    else
+        echo -e "\e[93mPHPMyAdmin is not installed.\033[0m" | tee -a "$LOG_FILE"
+    fi
 
-#     # Remove Apache
-#     echo -e "\e[33mRemoving Apache...\033[0m" | tee -a "$LOG_FILE"
-#     sudo systemctl stop apache2 || {
-#         echo -e "\e[91mFailed to stop Apache. Continuing anyway...\033[0m" | tee -a "$LOG_FILE"
-#     }
-#     sudo systemctl disable apache2 || {
-#         echo -e "\e[91mFailed to disable Apache. Continuing anyway...\033[0m" | tee -a "$LOG_FILE"
-#     }
-#     sudo apt-get purge -y apache2 apache2-utils apache2-bin apache2-data libapache2-mod-php* || {
-#         echo -e "\e[91mFailed to purge Apache packages.\033[0m" | tee -a "$LOG_FILE"
-#     }
-#     sudo apt-get autoremove --purge -y
-#     sudo apt-get autoclean -y
-#     sudo rm -rf /etc/apache2 /var/www/html
+    # Remove Apache
+    echo -e "\e[33mRemoving Apache...\033[0m" | tee -a "$LOG_FILE"
+    sudo systemctl stop apache2 || {
+        echo -e "\e[91mFailed to stop Apache. Continuing anyway...\033[0m" | tee -a "$LOG_FILE"
+    }
+    sudo systemctl disable apache2 || {
+        echo -e "\e[91mFailed to disable Apache. Continuing anyway...\033[0m" | tee -a "$LOG_FILE"
+    }
+    sudo apt-get purge -y apache2 apache2-utils apache2-bin apache2-data libapache2-mod-php* || {
+        echo -e "\e[91mFailed to purge Apache packages.\033[0m" | tee -a "$LOG_FILE"
+    }
+    sudo apt-get autoremove --purge -y
+    sudo apt-get autoclean -y
+    sudo rm -rf /etc/apache2 /var/www/html
 
-#     # Delete Apache and PHP Settings
-#     echo -e "\e[33mRemoving Apache and PHP configurations...\033[0m" | tee -a "$LOG_FILE"
-#     sudo a2disconf phpmyadmin.conf &>/dev/null
-#     sudo rm -f /etc/apache2/conf-available/phpmyadmin.conf
-#     sudo systemctl restart apache2
+    # Delete Apache and PHP Settings
+    echo -e "\e[33mRemoving Apache and PHP configurations...\033[0m" | tee -a "$LOG_FILE"
+    sudo a2disconf phpmyadmin.conf &>/dev/null
+    sudo rm -f /etc/apache2/conf-available/phpmyadmin.conf
+    sudo systemctl restart apache2
 
-#     # Remove Unnecessary Packages
-#     echo -e "\e[33mRemoving additional packages...\033[0m" | tee -a "$LOG_FILE"
-#     sudo apt-get remove -y php-soap php-ssh2 libssh2-1-dev libssh2-1 \
-#         && echo -e "\e[92mRemoved additional PHP packages.\033[0m" | tee -a "$LOG_FILE" || echo -e "\e[93mSome additional PHP packages may not be installed.\033[0m" | tee -a "$LOG_FILE"
+    # Remove Unnecessary Packages
+    echo -e "\e[33mRemoving additional packages...\033[0m" | tee -a "$LOG_FILE"
+    sudo apt-get remove -y php-soap php-ssh2 libssh2-1-dev libssh2-1 \
+        && echo -e "\e[92mRemoved additional PHP packages.\033[0m" | tee -a "$LOG_FILE" || echo -e "\e[93mSome additional PHP packages may not be installed.\033[0m" | tee -a "$LOG_FILE"
 
-#     # Reset Firewall (without changing SSL rules)
-#     echo -e "\e[33mResetting firewall rules (except SSL)...\033[0m" | tee -a "$LOG_FILE"
-#     sudo ufw delete allow 'Apache'
-#     sudo ufw reload
+    # Reset Firewall (without changing SSL rules)
+    echo -e "\e[33mResetting firewall rules (except SSL)...\033[0m" | tee -a "$LOG_FILE"
+    sudo ufw delete allow 'Apache'
+    sudo ufw reload
 
-#     echo -e "\e[92mMirza Bot, MySQL, and their dependencies have been completely removed.\033[0m" | tee -a "$LOG_FILE"
-# }
+    echo -e "\e[92mMirza Pro Bot, MySQL, and their dependencies have been completely removed.\033[0m" | tee -a "$LOG_FILE"
+}
 
 # function remove_bot_with_marzban() {
 #     echo -e "\e[33mRemoving Mirza Bot alongside Marzban...\033[0m" | tee -a "$LOG_FILE"
@@ -1664,7 +1672,7 @@ EOF
 #     echo -e "\e[92mMirza Bot has been removed alongside Marzban. SSL certificates remain intact.\033[0m" | tee -a "$LOG_FILE"
 # }
 
-# Extract database credentials from config.php
+#Extract database credentials from config.php
 # function extract_db_credentials() {
 #     CONFIG_PATH="/var/www/html/mirzabotconfig/config.php"
 #     if [ -f "$CONFIG_PATH" ]; then
@@ -2668,12 +2676,12 @@ EOF
 # Main Argument Processing
 process_arguments() {
     case "$1" in
-        -update)
+        update)
             # If there is a specific update function logic for Pro, call it here
             # For now, we can re-run install or a specific update function
             update_bot 
             ;;
-        -remove)
+        remove)
             remove_bot
             ;;
         *)
