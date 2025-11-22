@@ -158,9 +158,8 @@ if ($setting['statusnamecustom'] == 'onnamecustom')
     $statusnote = true;
 if ($setting['statusnoteforf'] == "0" && $user['agent'] == "f")
     $statusnote = false;
-if (!function_exists('createForumTopicIfMissing')) {
-    function createForumTopicIfMissing($currentId, $reportKey, $topicName, $channelId)
-    {
+function createForumTopicIfMissing($currentId, $reportKey, $topicName, $channelId)
+{
         $numericId = intval($currentId);
         if ($numericId !== 0) {
             return;
@@ -192,7 +191,6 @@ if (!function_exists('createForumTopicIfMissing')) {
             update("topicid", "idreport", $threadId, "report", $reportKey);
         }
     }
-}
 
 //createForumTopicIfMissing($porsantreport, 'porsantreport', $textbotlang['Admin']['affiliates']['titletopic'], $setting['Channel_Report']);
 //createForumTopicIfMissing($reportnight, 'reportnight', $textbotlang['Admin']['report']['reportnight'], $setting['Channel_Report']);
