@@ -3369,8 +3369,8 @@ if ($user['step'] == "createusertest" || preg_match('/locationtest_(.*)/', $data
     $textcreatuser = str_replace('{day}', $marzban_list_get['time_usertest'], $textcreatuser);
     $textcreatuser = str_replace('{volume}', $marzban_list_get['val_usertest'], $textcreatuser);
     $textcreatuser = str_replace('{config}', "<code>{$output_config_link}</code>", $textcreatuser);
-    $textcreatuser = str_replace('{links}', $config, $textcreatuser);
-    $textcreatuser = str_replace('{links2}', $output_config_link, $textcreatuser);
+    $textcreatuser = str_replace('{links}', "<code>{$config}</code>", $textcreatuser);
+    $textcreatuser = str_replace('{links2}', "<code>{$output_config_link}</code>", $textcreatuser);
     if ($marzban_list_get['type'] == "ibsng" || $marzban_list_get['type'] == "mikrotik") {
         $textcreatuser = str_replace('{password}', $dataoutput['subscription_url'], $textcreatuser);
         update("invoice", "user_info", $dataoutput['subscription_url'], "id_invoice", $randomString);
@@ -4995,7 +4995,7 @@ $textonebuy
         $textcreatuser = str_replace('{volume}', $info_product['Volume_constraint'], $textcreatuser);
         $textcreatuser = str_replace('{config}', "<code>{$output_config_link}</code>", $textcreatuser);
         $textcreatuser = str_replace('{links}', "<code>{$config}</code>", $textcreatuser);
-        $textcreatuser = str_replace('{links2}', "{$output_config_link}", $textcreatuser);
+        $textcreatuser = str_replace('{links2}', "<code>{$output_config_link}</code>", $textcreatuser);
         sendMessageService($marzban_list_get, $dataoutput['configs'], $output_config_link, $dataoutput['username'], $Shoppinginfo, $textcreatuser, $randomString);
     }
     sendmessage($from_id, $textbotlang['users']['selectoption'], $keyboard, 'HTML');
