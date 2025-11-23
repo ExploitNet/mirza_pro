@@ -930,8 +930,8 @@ function DirectPayment($order_id, $image = 'images.jpg')
         $textcreatuser = str_replace('{day}', $get_invoice['Service_time'], $textcreatuser);
         $textcreatuser = str_replace('{volume}', $get_invoice['Volume'], $textcreatuser);
         $textcreatuser = str_replace('{config}', "<code>{$output_config_link}</code>", $textcreatuser);
-        $textcreatuser = str_replace('{links}', $config, $textcreatuser);
-        $textcreatuser = str_replace('{links2}', "{$output_config_link}", $textcreatuser);
+        $textcreatuser = str_replace('{links}', "<code>{$config}</code>", $textcreatuser);
+        $textcreatuser = str_replace('{links2}', "<code>{$output_config_link}</code>", $textcreatuser);
         if ($marzban_list_get['type'] == "Manualsale" || $marzban_list_get['type'] == "ibsng" || $marzban_list_get['type'] == "mikrotik") {
             $textcreatuser = str_replace('{password}', $dataoutput['subscription_url'], $textcreatuser);
             update("invoice", "user_info", $dataoutput['subscription_url'], "id_invoice", $get_invoice['id_invoice']);
