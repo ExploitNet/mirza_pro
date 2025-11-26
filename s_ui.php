@@ -23,7 +23,6 @@ curl_setopt_array($curl, array(
 ));
 $output = [];
 $response = curl_exec($curl);
-file_put_contents('ss',$url);
 if(!isset($response))return [];
 $response = json_decode($response,true);
 if(!$response['success'])return [];
