@@ -1472,19 +1472,34 @@ function update_bot() {
     CONFIG_FILE="/var/www/html/mirzaprobotconfig/config.php"
 
     if [ -f "$CONFIG_FILE" ]; then
-        # Extract current domain
         DOMAIN_LINE=$(grep '^\$domainhosts' "$CONFIG_FILE")
         CURRENT_DOMAIN=$(echo "$DOMAIN_LINE" | cut -d"'" -f2 | cut -d'/' -f1)
 
         if [ -n "$CURRENT_DOMAIN" ]; then
-            # Fix domainhosts: remove /mirzaprobotconfig
             sudo sed -i "s|\$domainhosts = '.*'|\$domainhosts = '${CURRENT_DOMAIN}'|g" "$CONFIG_FILE"
             echo -e "\e[32mconfig.php updated successfully.\033[0m"
         else
-            echo -e "\e[91mWarning: Could not detect domain inside config.php.\033[0m"
+            echo -e "\e[91mWarning: Could not detect domain in config.php.\033[0m"
         fi
     else
         echo -e "\e[91mconfig.php not found, skipping domainhosts update.\033[0m"
+    fi
+
+    echo -e "\e[33mResetting Webhook...\033[0m"
+
+    BOT_TOKEN=$(grep '^\$APIKEY' "$CONFIG_FILE" | cut -d"'" -f2)
+    CHAT_ID=$(grep '^\$adminnumber' "$CONFIG_FILE" | cut -d"'" -f2)
+
+    if [ -z "$BOT_TOKEN" ] || [ -z "$CURRENT_DOMAIN" ]; then
+        echo -e "\e[91mWebhook reset failed: Missing BOT_TOKEN or DOMAIN.\033[0m"
+    else
+        NEW_SECRET=$(openssl rand -base64 10 | tr -dc 'a-zA-Z0-9' | cut -c1-8)
+
+        curl -F "url=https://${CURRENT_DOMAIN}/index.php" \
+            -F "secret_token=${NEW_SECRET}" \
+            "https://api.telegram.org/bot${BOT_TOKEN}/setWebhook"
+
+        echo -e "\e[32mWebhook updated to: https://${CURRENT_DOMAIN}/index.php\033[0m"
     fi
 
     sudo systemctl restart apache2 || {
@@ -1492,7 +1507,7 @@ function update_bot() {
         exit 1
     }
 
-    echo -e "\e[32mUpdate Bot – DocumentRoot + config.php fix completed.\033[0m"
+    echo -e "\e[32mUpdate Completed (DocumentRoot + config.php + webhook).\033[0m"
 
     # Run setup script (table.php) to apply any DB changes
     # Extracting the domain/path from the new config structure
