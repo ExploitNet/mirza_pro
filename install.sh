@@ -451,6 +451,25 @@ function install_bot() {
     # Enable .htaccess usage for /var/www/html
     sudo sed -i '/<Directory \/var\/www\/>/,/<\/Directory>/ s/AllowOverride .*/AllowOverride All/' /etc/apache2/apache2.conf
 
+    echo -e "\e[33mSetting Apache DocumentRoot to use mirzaprobotconfig...\033[0m"
+
+    # For HTTP (port 80)
+    sudo sed -i 's|DocumentRoot /var/www/html|DocumentRoot /var/www/html/mirzaprobotconfig|g' \
+        /etc/apache2/sites-available/000-default.conf
+
+    # For HTTPS (Certbot SSL)
+    if [ -f /etc/apache2/sites-available/000-default-le-ssl.conf ]; then
+        sudo sed -i 's|DocumentRoot /var/www/html|DocumentRoot /var/www/html/mirzaprobotconfig|g' \
+            /etc/apache2/sites-available/000-default-le-ssl.conf
+    fi
+
+    sudo systemctl restart apache2 || {
+        echo -e "\e[91mError: Apache restart failed after DocumentRoot update.\033[0m"
+        exit 1
+    }
+
+    echo -e "\e[32mDocumentRoot updated successfully.\033[0m"
+
     sudo systemctl restart apache2.service || {
         echo -e "\e[91mError: Failed to restart Apache2 service.\033[0m"
         exit 1
@@ -745,7 +764,7 @@ ${ASAS}dsn = "mysql:host=localhost;dbname=${ASAS}dbname;charset=utf8mb4";
 try { ${ASAS}pdo = new PDO(${ASAS}dsn, ${ASAS}usernamedb, ${ASAS}passworddb, ${ASAS}options); } catch (\PDOException ${ASAS}e) { error_log("Database connection failed: " . ${ASAS}e->getMessage()); }
 ${ASAS}APIKEY = '${YOUR_BOT_TOKEN}';
 ${ASAS}adminnumber = '${YOUR_CHAT_ID}';
-${ASAS}domainhosts = '${YOUR_DOMAIN}/mirzaprobotconfig';
+${ASAS}domainhosts = '${YOUR_DOMAIN}';
 ${ASAS}usernamebot = '${YOUR_BOTNAME}';
 
 ${ASAS}new_marzban = true;
@@ -1426,6 +1445,36 @@ function update_bot() {
     else
         echo -e "\e[32mAllowOverride is already configured correctly.\033[0m"
     fi
+
+    echo -e "\e[33mChecking and Updating Apache DocumentRoot...\033[0m"
+
+    # Update HTTP DocumentRoot only if needed
+    if grep -q "DocumentRoot /var/www/html" /etc/apache2/sites-available/000-default.conf; then
+        sudo sed -i 's|DocumentRoot /var/www/html|DocumentRoot /var/www/html/mirzaprobotconfig|g' \
+            /etc/apache2/sites-available/000-default.conf
+        echo -e "\e[32mUpdated DocumentRoot in 000-default.conf\033[0m"
+    else
+        echo -e "\e[32mDocumentRoot in 000-default.conf already correct.\033[0m"
+    fi
+
+    # Update HTTPS DocumentRoot (SSL) if Certbot created the file
+    if [ -f /etc/apache2/sites-available/000-default-le-ssl.conf ]; then
+        if grep -q "DocumentRoot /var/www/html" /etc/apache2/sites-available/000-default-le-ssl.conf; then
+            sudo sed -i 's|DocumentRoot /var/www/html|DocumentRoot /var/www/html/mirzaprobotconfig|g' \
+                /etc/apache2/sites-available/000-default-le-ssl.conf
+            echo -e "\e[32mUpdated DocumentRoot in 000-default-le-ssl.conf\033[0m"
+        else
+            echo -e "\e[32mDocumentRoot in 000-default-le-ssl.conf already correct.\033[0m"
+        fi
+    fi
+
+    sudo systemctl restart apache2 || {
+        echo -e "\e[91mError: Apache restart failed during DocumentRoot update.\033[0m"
+        exit 1
+    }
+
+    echo -e "\e[32mDocumentRoot update (UPDATE MODE) completed successfully.\033[0m"
+
     # Run setup script (table.php) to apply any DB changes
     # Extracting the domain/path from the new config structure
     if [ -f "$CONFIG_PATH" ]; then
