@@ -1457,7 +1457,7 @@ function update_bot() {
         echo -e "\e[32mDocumentRoot in 000-default.conf already correct.\033[0m"
     fi
 
-    # Update HTTPS DocumentRoot (SSL) if Certbot created the file
+    # Update HTTPS DocumentRoot (SSL)
     if [ -f /etc/apache2/sites-available/000-default-le-ssl.conf ]; then
         if grep -q "DocumentRoot /var/www/html" /etc/apache2/sites-available/000-default-le-ssl.conf; then
             sudo sed -i 's|DocumentRoot /var/www/html|DocumentRoot /var/www/html/mirzaprobotconfig|g' \
@@ -1468,12 +1468,31 @@ function update_bot() {
         fi
     fi
 
+    echo -e "\e[33mUpdating config.php domainhosts...\033[0m"
+    CONFIG_FILE="/var/www/html/mirzaprobotconfig/config.php"
+
+    if [ -f "$CONFIG_FILE" ]; then
+        # Extract current domain
+        DOMAIN_LINE=$(grep '^\$domainhosts' "$CONFIG_FILE")
+        CURRENT_DOMAIN=$(echo "$DOMAIN_LINE" | cut -d"'" -f2 | cut -d'/' -f1)
+
+        if [ -n "$CURRENT_DOMAIN" ]; then
+            # Fix domainhosts: remove /mirzaprobotconfig
+            sudo sed -i "s|\$domainhosts = '.*'|\$domainhosts = '${CURRENT_DOMAIN}'|g" "$CONFIG_FILE"
+            echo -e "\e[32mconfig.php updated successfully.\033[0m"
+        else
+            echo -e "\e[91mWarning: Could not detect domain inside config.php.\033[0m"
+        fi
+    else
+        echo -e "\e[91mconfig.php not found, skipping domainhosts update.\033[0m"
+    fi
+
     sudo systemctl restart apache2 || {
-        echo -e "\e[91mError: Apache restart failed during DocumentRoot update.\033[0m"
+        echo -e "\e[91mError: Apache restart failed during update.\033[0m"
         exit 1
     }
 
-    echo -e "\e[32mDocumentRoot update (UPDATE MODE) completed successfully.\033[0m"
+    echo -e "\e[32mUpdate Bot – DocumentRoot + config.php fix completed.\033[0m"
 
     # Run setup script (table.php) to apply any DB changes
     # Extracting the domain/path from the new config structure
