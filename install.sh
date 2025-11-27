@@ -1411,6 +1411,21 @@ function update_bot() {
     sudo chown -R www-data:www-data "$BOT_DIR"
     sudo chmod -R 755 "$BOT_DIR"
 
+    # Check and apply AllowOverride fix if needed
+    if grep -q "<Directory /var/www/>" /etc/apache2/apache2.conf &&
+        grep -A3 "<Directory /var/www/>" /etc/apache2/apache2.conf | grep -q "AllowOverride None"; then
+
+        echo -e "\e[33mAllowOverride is None. Applying fix...\033[0m"
+
+        sudo sed -i '/<Directory \/var\/www\/>/,/<\/Directory>/ s/AllowOverride .*/AllowOverride All/' \
+            /etc/apache2/apache2.conf
+
+        sudo systemctl restart apache2
+
+        echo -e "\e[32mAllowOverride All applied.\033[0m"
+    else
+        echo -e "\e[32mAllowOverride is already configured correctly.\033[0m"
+    fi
     # Run setup script (table.php) to apply any DB changes
     # Extracting the domain/path from the new config structure
     if [ -f "$CONFIG_PATH" ]; then
