@@ -449,6 +449,10 @@ function install_bot() {
         exit 1
     }
 
+     # Enable .htaccess usage for /var/www/html
+    sudo sed -i '/<Directory \/var\/www\/html>/,/<\/Directory>/ s/AllowOverride .*/AllowOverride All/' /etc/apache2/apache2.conf
+
+    
     sudo systemctl restart apache2.service || {
         echo -e "\e[91mError: Failed to restart Apache2 service.\033[0m"
         exit 1
