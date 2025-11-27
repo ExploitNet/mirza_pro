@@ -38,7 +38,7 @@ function self_update_script() {
 
             echo -e "\e[32mProcess updated. Restarting...\033[0m"
             sleep 1
-            
+
             exec bash "$MASTER_PATH" "$@"
         else
             echo -e "\e[32mScript is up to date.\033[0m"
@@ -52,8 +52,8 @@ function self_update_script() {
     else
         echo -e "\e[91mWarning: Could not check for updates (Connection failed).\033[0m"
         if [ ! -f "$MASTER_PATH" ]; then
-             echo -e "\e[91mCritical: Cannot install script for the first time without internet.\033[0m"
-             exit 1
+            echo -e "\e[91mCritical: Cannot install script for the first time without internet.\033[0m"
+            exit 1
         fi
         rm -f "$TEMP_FILE"
     fi
@@ -72,7 +72,7 @@ check_ssl_status() {
             expiry_date=$(openssl x509 -enddate -noout -in "/etc/letsencrypt/live/$domain/cert.pem" | cut -d= -f2)
             current_date=$(date +%s)
             expiry_timestamp=$(date -d "$expiry_date" +%s)
-            days_remaining=$(( ($expiry_timestamp - $current_date) / 86400 ))
+            days_remaining=$((($expiry_timestamp - $current_date) / 86400))
             if [ $days_remaining -gt 0 ]; then
                 echo -e "\033[32m✅ SSL Certificate: $days_remaining days remaining (Domain: $domain)\033[0m"
             else
@@ -125,7 +125,6 @@ function show_logo() {
     echo ""
 }
 
-
 # Display Menu
 function show_menu() {
     show_logo
@@ -142,32 +141,32 @@ function show_menu() {
     echo ""
     read -p "Select an option [1-10]: " option
     case $option in
-        1) install_bot ;;
-        2) update_bot ;;
-        3) remove_bot ;;
-        # 4) export_database ;;
-        # 5) import_database ;;
-        # 6) auto_backup ;;
-        # 7) renew_ssl ;;
-        # 8) change_domain ;;
-        # 9) manage_additional_bots ;;
-        10)
-            echo -e "\033[32mExiting...\033[0m"
-            exit 0
-            ;;
-        *)
-            echo -e "\033[31mInvalid option. Please try again.\033[0m"
-            show_menu
-            ;;
+    1) install_bot ;;
+    2) update_bot ;;
+    3) remove_bot ;;
+    # 4) export_database ;;
+    # 5) import_database ;;
+    # 6) auto_backup ;;
+    # 7) renew_ssl ;;
+    # 8) change_domain ;;
+    # 9) manage_additional_bots ;;
+    10)
+        echo -e "\033[32mExiting...\033[0m"
+        exit 0
+        ;;
+    *)
+        echo -e "\033[31mInvalid option. Please try again.\033[0m"
+        show_menu
+        ;;
     esac
 }
 
 # Check if Marzban is installed
 function check_marzban_installed() {
     if [ -f "/opt/marzban/docker-compose.yml" ]; then
-        return 0  # Marzban installed
+        return 0 # Marzban installed
     else
-        return 1  # Marzban not installed
+        return 1 # Marzban not installed
     fi
 }
 
@@ -175,7 +174,7 @@ function check_marzban_installed() {
 function detect_database_type() {
     COMPOSE_FILE="/opt/marzban/docker-compose.yml"
     if [ ! -f "$COMPOSE_FILE" ]; then
-        echo "unknown"  # File not found, cannot determine database type
+        echo "unknown" # File not found, cannot determine database type
         return 1
     fi
     if grep -q "^[[:space:]]*mysql:" "$COMPOSE_FILE"; then
@@ -185,7 +184,7 @@ function detect_database_type() {
         echo "mariadb"
         return 1
     else
-        echo "sqlite"  # Assume SQLite if neither MySQL nor MariaDB is found
+        echo "sqlite" # Assume SQLite if neither MySQL nor MariaDB is found
         return 1
     fi
 }
@@ -231,7 +230,7 @@ function fix_update_issues() {
     for mirror in "${MIRRORS[@]}"; do
         echo -e "\e[33mTrying mirror: $mirror\033[0m"
         # Create new sources.list
-        cat > /etc/apt/sources.list << EOF
+        cat >/etc/apt/sources.list <<EOF
 deb http://$mirror/ubuntu/ $UBUNTU_CODENAME main restricted universe multiverse
 deb http://$mirror/ubuntu/ $UBUNTU_CODENAME-updates main restricted universe multiverse
 deb http://$mirror/ubuntu/ $UBUNTU_CODENAME-security main restricted universe multiverse
@@ -257,7 +256,7 @@ function install_bot() {
     # Check if Marzban is installed and redirect to appropriate function
     if check_marzban_installed; then
         echo -e "\033[41m[IMPORTANT WARNING]\033[0m \033[1;33mMarzban detected. Proceeding with Marzban-compatible installation.\033[0m"
-        install_bot_with_marzban "$@"  # Pass any arguments (e.g., -v beta)
+        install_bot_with_marzban "$@" # Pass any arguments (e.g., -v beta)
         return 0
     fi
 
@@ -449,10 +448,9 @@ function install_bot() {
         exit 1
     }
 
-     # Enable .htaccess usage for /var/www/html
-    sudo sed -i '/<Directory \/var\/www\/html>/,/<\/Directory>/ s/AllowOverride .*/AllowOverride All/' /etc/apache2/apache2.conf
+    # Enable .htaccess usage for /var/www/html
+    sudo sed -i '/<Directory \/var\/www\/>/,/<\/Directory>/ s/AllowOverride .*/AllowOverride All/' /etc/apache2/apache2.conf
 
-    
     sudo systemctl restart apache2.service || {
         echo -e "\e[91mError: Failed to restart Apache2 service.\033[0m"
         exit 1
@@ -503,7 +501,6 @@ function install_bot() {
 
     echo -e "\n\033[33mMirza Pro config and script have been installed successfully.\033[0m"
 
-
     wait
     if [ ! -d "/root/confmirza" ]; then
         sudo mkdir /root/confmirza || {
@@ -527,9 +524,9 @@ function install_bot() {
 
         ASAS="$"
 
-        echo "${ASAS}user = 'root';" >> /root/confmirza/dbrootmirza.txt
-        echo "${ASAS}pass = '${randomdbpasstxt}';" >> /root/confmirza/dbrootmirza.txt
-        echo "${ASAS}path = '${RANDOM_NUMBER}';" >> /root/confmirza/dbrootmirza.txt
+        echo "${ASAS}user = 'root';" >>/root/confmirza/dbrootmirza.txt
+        echo "${ASAS}pass = '${randomdbpasstxt}';" >>/root/confmirza/dbrootmirza.txt
+        echo "${ASAS}path = '${RANDOM_NUMBER}';" >>/root/confmirza/dbrootmirza.txt
 
         sleep 1
 
@@ -566,7 +563,6 @@ EOF
     else
         echo "Folder already exists."
     fi
-
 
     clear
 
@@ -722,13 +718,13 @@ EOF
             file_path="/var/www/html/mirzaprobotconfig/config.php"
 
             if [ -f "$file_path" ]; then
-              rm "$file_path" || {
-                echo -e "\e[91mError: Failed to delete old config.php.\033[0m"
-                exit 1
-              }
-              echo -e "File deleted successfully."
+                rm "$file_path" || {
+                    echo -e "\e[91mError: Failed to delete old config.php.\033[0m"
+                    exit 1
+                }
+                echo -e "File deleted successfully."
             else
-              echo -e "File not found."
+                echo -e "File not found."
             fi
 
             sleep 1
@@ -736,7 +732,7 @@ EOF
             secrettoken=$(openssl rand -base64 10 | tr -dc 'a-zA-Z0-9' | cut -c1-8)
 
             # CHANGED: Generate config.php with new Pro structure
-            cat <<EOF > /var/www/html/mirzaprobotconfig/config.php
+            cat <<EOF >/var/www/html/mirzaprobotconfig/config.php
 <?php
 ${ASAS}dbname = '$dbname';
 ${ASAS}usernamedb = '$dbuser';
@@ -760,8 +756,8 @@ EOF
 
             # CHANGED: Update URL path in webhook and table setup
             curl -F "url=https://${YOUR_DOMAIN}/mirzaprobotconfig/index.php" \
-     -F "secret_token=${secrettoken}" \
-     "https://api.telegram.org/bot${YOUR_BOT_TOKEN}/setWebhook" || {
+                -F "secret_token=${secrettoken}" \
+                "https://api.telegram.org/bot${YOUR_BOT_TOKEN}/setWebhook" || {
                 echo -e "\e[91mError: Failed to set webhook for bot.\033[0m"
                 exit 1
             }
@@ -794,7 +790,6 @@ EOF
             echo " "
             echo -e "Mirza Pro Bot"
         fi
-
 
     elif [ "$ROOT_PASSWORD" = "" ] || [ "$ROOT_USER" = "" ]; then
         echo -e "\n\e[36mThe password is empty.\033[0m\n"
@@ -1412,7 +1407,6 @@ function update_bot() {
     else
         echo -e "\n\e[91mWarning: install.sh not found in update files.\033[0m"
     fi
-
     # Set permissions
     sudo chown -R www-data:www-data "$BOT_DIR"
     sudo chmod -R 755 "$BOT_DIR"
@@ -1423,7 +1417,7 @@ function update_bot() {
         URL_PATH=$(grep "^\$domainhosts" "$CONFIG_PATH" | cut -d"'" -f2)
         if [ -n "$URL_PATH" ]; then
             echo -e "\e[33mUpdating database tables...\033[0m"
-            curl -s "https://$URL_PATH/table.php" > /dev/null || {
+            curl -s "https://$URL_PATH/table.php" >/dev/null || {
                 echo -e "\e[91mSetup script execution failed! Check logs.\033[0m"
             }
         fi
@@ -1448,7 +1442,7 @@ function update_bot() {
 function remove_bot() {
     echo -e "\e[33mStarting Mirza Pro Bot removal process...\033[0m"
     LOG_FILE="/var/log/remove_bot.log"
-    echo "Log file: $LOG_FILE" > "$LOG_FILE"
+    echo "Log file: $LOG_FILE" >"$LOG_FILE"
 
     # Check if Mirza Pro Bot is installed
     BOT_DIR="/var/www/html/mirzaprobotconfig"
@@ -1550,8 +1544,8 @@ function remove_bot() {
 
     # Remove Unnecessary Packages
     echo -e "\e[33mRemoving additional packages...\033[0m" | tee -a "$LOG_FILE"
-    sudo apt-get remove -y php-soap php-ssh2 libssh2-1-dev libssh2-1 \
-        && echo -e "\e[92mRemoved additional PHP packages.\033[0m" | tee -a "$LOG_FILE" || echo -e "\e[93mSome additional PHP packages may not be installed.\033[0m" | tee -a "$LOG_FILE"
+    sudo apt-get remove -y php-soap php-ssh2 libssh2-1-dev libssh2-1 &&
+        echo -e "\e[92mRemoved additional PHP packages.\033[0m" | tee -a "$LOG_FILE" || echo -e "\e[93mSome additional PHP packages may not be installed.\033[0m" | tee -a "$LOG_FILE"
 
     # Reset Firewall (without changing SSL rules)
     echo -e "\e[33mResetting firewall rules (except SSL)...\033[0m" | tee -a "$LOG_FILE"
@@ -1913,10 +1907,10 @@ function remove_bot() {
 # }
 
 # Function to renew SSL certificates
-# 
+#
 
 # Function to Manage Additional Bots
-# 
+#
 
 # function change_domain() {
 #     local new_domain
@@ -2186,7 +2180,6 @@ function remove_bot() {
 #     echo -e "\033[33mDatabase password: \033[36m$DB_PASSWORD\033[0m"
 # }
 
-
 # Function to Update Additional Bot
 # function update_additional_bot() {
 #     clear
@@ -2374,7 +2367,7 @@ function remove_bot() {
 #     echo -e "\033[32m$SELECTED_BOT has been successfully removed.\033[0m"
 # }
 
-    #Function to export additional bot database
+#Function to export additional bot database
 # function export_additional_bot_database() {
 #     clear
 #     echo -e "\033[36mAvailable Bots:\033[0m"
@@ -2680,23 +2673,23 @@ function remove_bot() {
 # Main Argument Processing
 process_arguments() {
     case "$1" in
-        update)
-            # If there is a specific update function logic for Pro, call it here
-            # For now, we can re-run install or a specific update function
-            update_bot 
-            ;;
-        remove)
-            remove_bot
-            ;;
-        *)
-            # Default action or Show Menu
-            # If arguments are passed but not recognized (like -v), ignore versioning for Pro
-            # since we only use the main branch.
-            if [ -n "$1" ]; then
-                echo -e "\e[33mNote: Mirza Pro only uses the latest version from GitHub Main branch.\033[0m"
-            fi
-            show_menu
-            ;;
+    update)
+        # If there is a specific update function logic for Pro, call it here
+        # For now, we can re-run install or a specific update function
+        update_bot
+        ;;
+    remove)
+        remove_bot
+        ;;
+    *)
+        # Default action or Show Menu
+        # If arguments are passed but not recognized (like -v), ignore versioning for Pro
+        # since we only use the main branch.
+        if [ -n "$1" ]; then
+            echo -e "\e[33mNote: Mirza Pro only uses the latest version from GitHub Main branch.\033[0m"
+        fi
+        show_menu
+        ;;
     esac
 }
 
