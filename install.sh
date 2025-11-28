@@ -451,25 +451,6 @@ function install_bot() {
     # Enable .htaccess usage for /var/www/html
     sudo sed -i '/<Directory \/var\/www\/>/,/<\/Directory>/ s/AllowOverride .*/AllowOverride All/' /etc/apache2/apache2.conf
 
-    echo -e "\e[33mSetting Apache DocumentRoot to use mirzaprobotconfig...\033[0m"
-
-    # For HTTP (port 80)
-    sudo sed -i 's|DocumentRoot /var/www/html|DocumentRoot /var/www/html/mirzaprobotconfig|g' \
-        /etc/apache2/sites-available/000-default.conf
-
-    # For HTTPS (Certbot SSL)
-    if [ -f /etc/apache2/sites-available/000-default-le-ssl.conf ]; then
-        sudo sed -i 's|DocumentRoot /var/www/html|DocumentRoot /var/www/html/mirzaprobotconfig|g' \
-            /etc/apache2/sites-available/000-default-le-ssl.conf
-    fi
-
-    sudo systemctl restart apache2 || {
-        echo -e "\e[91mError: Apache restart failed after DocumentRoot update.\033[0m"
-        exit 1
-    }
-
-    echo -e "\e[32mDocumentRoot updated successfully.\033[0m"
-
     sudo systemctl restart apache2.service || {
         echo -e "\e[91mError: Failed to restart Apache2 service.\033[0m"
         exit 1
@@ -615,6 +596,9 @@ EOF
         echo -e "\e[91mError: Failed to disable Apache2.\033[0m"
         exit 1
     }
+
+    sudo pkill -9 apache2 || true
+
     sudo apt install letsencrypt -y || {
         echo -e "\e[91mError: Failed to install letsencrypt.\033[0m"
         exit 1
@@ -623,16 +607,16 @@ EOF
         echo -e "\e[91mError: Failed to enable certbot timer.\033[0m"
         exit 1
     }
-    sudo certbot certonly --standalone --agree-tos --preferred-challenges http -d $DOMAIN_NAME || {
-        echo -e "\e[91mError: Failed to generate SSL certificate.\033[0m"
+    sudo apt install -y certbot || {
+        echo -e "\e[91mError installing certbot.\033[0m"
         exit 1
     }
-    sudo apt install python3-certbot-apache -y || {
-        echo -e "\e[91mError: Failed to install python3-certbot-apache.\033[0m"
-        exit 1
-    }
-    sudo certbot --apache --agree-tos --preferred-challenges http -d $DOMAIN_NAME || {
-        echo -e "\e[91mError: Failed to configure SSL with Certbot.\033[0m"
+
+    sudo certbot certonly --standalone \
+        --agree-tos \
+        --preferred-challenges http \
+        -d "$DOMAIN_NAME" || {
+        echo -e "\e[91mError generating SSL certificate.\033[0m"
         exit 1
     }
 
@@ -774,7 +758,7 @@ EOF
             sleep 1
 
             # CHANGED: Update URL path in webhook and table setup
-            curl -F "url=https://${YOUR_DOMAIN}/mirzaprobotconfig/index.php" \
+            curl -F "url=https://${YOUR_DOMAIN}/index.php" \
                 -F "secret_token=${secrettoken}" \
                 "https://api.telegram.org/bot${YOUR_BOT_TOKEN}/setWebhook" || {
                 echo -e "\e[91mError: Failed to set webhook for bot.\033[0m"
@@ -791,7 +775,7 @@ EOF
                 echo -e "\e[91mError: Failed to start Apache2.\033[0m"
                 exit 1
             }
-            url="https://${YOUR_DOMAIN}/mirzaprobotconfig/table.php"
+            url="https://${YOUR_DOMAIN}/table.php"
             curl $url || {
                 echo -e "\e[91mError: Failed to fetch URL from domain.\033[0m"
                 exit 1
@@ -1494,7 +1478,6 @@ function update_bot() {
     else
         echo -e "\e[91mconfig.php not found, skipping.\033[0m"
     fi
-
 
     echo -e "\e[33mChecking Webhook...\033[0m"
 
