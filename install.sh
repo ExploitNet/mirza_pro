@@ -100,7 +100,7 @@ function show_logo() {
     echo -e "\033[0m"
     echo ""
     echo -e "\033[1;36m+-------------------+---------------------------------------------------+\033[0m"
-    echo -e "\033[1;36m| Version           |\033[0m \033[33m0.3.3 (Pro)\033[0m"
+    echo -e "\033[1;36m| Version           |\033[0m \033[33m0.3.5 (Pro)\033[0m"
     echo -e "\033[1;36m+-------------------+---------------------------------------------------+\033[0m"
     echo -e "\033[1;36m| Telegram Channel  |\033[0m \033[34mhttps://t.me/mirzapanel\033[0m"
     echo -e "\033[1;36m+-------------------+---------------------------------------------------+\033[0m"
@@ -590,9 +590,26 @@ EOF
         echo -e "\e[91mError: Failed to enable VirtualHost for port 443.\033[0m"
         exit 1
     }
-    # Disable default sites
+    # --- FIX: REMOVE DEFAULT APACHE CONFIGS COMPLETELY ---
+    echo -e "\e[33mRemoving default Apache configurations to prevent conflicts...\033[0m"
+    
+    # 1. Disable sites
     sudo a2dissite 000-default.conf 2>/dev/null || true
+    sudo a2dissite 000-default-le-ssl.conf 2>/dev/null || true
     sudo a2dissite default-ssl.conf 2>/dev/null || true
+    
+    # 2. Remove symbolic links in sites-enabled (Forceful cleanup)
+    sudo rm -f /etc/apache2/sites-enabled/000-default.conf
+    sudo rm -f /etc/apache2/sites-enabled/000-default-le-ssl.conf
+    sudo rm -f /etc/apache2/sites-enabled/default-ssl.conf
+
+    # 3. Remove original files in sites-available (Optional but requested)
+    # This ensures they can never be enabled again by mistake
+    sudo rm -f /etc/apache2/sites-available/000-default.conf
+    sudo rm -f /etc/apache2/sites-available/000-default-le-ssl.conf
+    sudo rm -f /etc/apache2/sites-available/default-ssl.conf
+    sleep 3 
+
     # Enable SSL module
     sudo a2enmod ssl || {
         echo -e "\e[91mError: Failed to enable SSL module.\033[0m"
@@ -698,14 +715,14 @@ ${ASAS}dsn = "mysql:host=localhost;dbname=${ASAS}dbname;charset=utf8mb4";
 try { ${ASAS}pdo = new PDO(${ASAS}dsn, ${ASAS}usernamedb, ${ASAS}passworddb, ${ASAS}options); } catch (\PDOException ${ASAS}e) { error_log("Database connection failed: " . ${ASAS}e->getMessage()); }
 ${ASAS}APIKEY = '${YOUR_BOT_TOKEN}';
 ${ASAS}adminnumber = '${YOUR_CHAT_ID}';
-${ASAS}domainhosts = '${YOUR_DOMAIN}/mirzaprobotconfig';
+${ASAS}domainhosts = '${YOUR_DOMAIN}';
 ${ASAS}usernamebot = '${YOUR_BOTNAME}';
 ${ASAS}new_marzban = true;
 ?>
 EOF
             sleep 1
             # CHANGED: Update URL path in webhook and table setup
-            curl -F "url=https://${YOUR_DOMAIN}/mirzaprobotconfig/index.php" \
+            curl -F "url=https://${YOUR_DOMAIN}/index.php" \
      -F "secret_token=${secrettoken}" \
      "https://api.telegram.org/bot${YOUR_BOT_TOKEN}/setWebhook" || {
                 echo -e "\e[91mError: Failed to set webhook for bot.\033[0m"
@@ -722,7 +739,7 @@ EOF
                 exit 1
             }
             sleep 5
-            url="https://${YOUR_DOMAIN}/mirzaprobotconfig/table.php"
+            url="https://${YOUR_DOMAIN}/table.php"
             curl -k --max-time 10 $url > /dev/null 2>&1 || {
                 echo -e "\e[93mWarning: Could not reach URL immediately, but installation may still be successful.\033[0m"
             }
@@ -1339,9 +1356,23 @@ EOF
         if ! sudo apache2ctl -S 2>/dev/null | grep -q "$DOMAIN_NAME"; then
             sudo a2ensite "${DOMAIN_NAME}.conf" 2>/dev/null || true
             sudo a2ensite "${DOMAIN_NAME}-ssl.conf" 2>/dev/null || true
-            # Disable default sites if they exist
+
+            # --- FIX: CLEANUP DURING UPDATE ---
+            echo -e "\e[33mCleaning up conflicting default Apache sites...\033[0m"
+            
+            # Disable all variations of default sites
             sudo a2dissite 000-default.conf 2>/dev/null || true
+            sudo a2dissite 000-default-le-ssl.conf 2>/dev/null || true
             sudo a2dissite default-ssl.conf 2>/dev/null || true
+            
+            # Force remove links from sites-enabled
+            sudo rm -f /etc/apache2/sites-enabled/000-default* 2>/dev/null || true
+            sudo rm -f /etc/apache2/sites-enabled/default-ssl* 2>/dev/null || true
+            
+            # Remove the source files to be sure
+            sudo rm -f /etc/apache2/sites-available/000-default.conf 2>/dev/null || true
+            sudo rm -f /etc/apache2/sites-available/000-default-le-ssl.conf 2>/dev/null || true
+            sleep 3 
             # Enable SSL module
             sudo a2enmod ssl 2>/dev/null || true
         fi
