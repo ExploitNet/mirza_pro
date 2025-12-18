@@ -1980,7 +1980,7 @@ function sendMessageService($panel_info, $config, $sub_link, $username_service, 
     }
     if ($STATUS_SEND_MESSAGE_PHOTO) {
         if ($panel_info['type'] == "WGDashboard") {
-            $urlimage = "{$panel_info['inboundid']}_{$username_service}.conf";
+            $urlimage = "{$panel_info['inboundid']}_{$invoice_id}.conf";
             file_put_contents($urlimage, $sub_link);
             telegram('senddocument', [
                 'chat_id' => $user_id,
