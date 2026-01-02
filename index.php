@@ -5340,7 +5340,7 @@ $textonebuy
         $message_id = sendmessage($from_id, $textnowpayments, $paymentkeyboard, 'HTML');
         updatePaymentMessageId($message_id, $randomString);
     } elseif ($datain == "plisio") {
-        $rates = requireTronRates(['TRX', 'USD']);
+        $rates = rate_arze();
         if ($rates === null) {
             sendmessage($from_id, $textbotlang['users']['Balance']['errorLinkPayment'], $keyboard, 'HTML');
             step('home', $from_id);
@@ -5436,7 +5436,7 @@ $textonebuy
         $message_id = sendmessage($from_id, $textnowpayments, $paymentkeyboard, 'HTML');
         updatePaymentMessageId($message_id, $randomString);
     } elseif ($datain == "nowpayment") {
-        $rates = requireTronRates(['TRX', 'USD']);
+        $rates = rate_arze();
         if ($rates === null) {
             sendmessage($from_id, $textbotlang['users']['Balance']['errorLinkPayment'], $keyboard, 'HTML');
             step('home', $from_id);
@@ -5532,7 +5532,7 @@ $textonebuy
         $message_id = sendmessage($from_id, $textnowpayments, $paymentkeyboard, 'HTML');
         updatePaymentMessageId($message_id, $randomString);
     } elseif ($datain == "iranpay1") {
-        $rates = requireTronRates(['TRX', 'USD']);
+        $rates = rate_arze();
         if ($rates === null) {
             sendmessage($from_id, $textbotlang['users']['Balance']['errorLinkPayment'], $keyboard, 'HTML');
             step('home', $from_id);
@@ -5617,7 +5617,7 @@ $textonebuy
         $message_id = sendmessage($from_id, $textnowpayments, $paymentkeyboard, 'HTML');
         updatePaymentMessageId($message_id, $randomString);
     } elseif ($datain == "iranpay2") {
-        $rates = requireTronRates(['TRX', 'USD']);
+        $rates = rate_arze();
         if ($rates === null) {
             sendmessage($from_id, $textbotlang['users']['Balance']['errorLinkPayment'], $keyboard, 'HTML');
             step('home', $from_id);
@@ -5711,7 +5711,7 @@ $textonebuy
 ‼️درحال حاظر از روش پرداخت دیگری استفاده کنید", null, 'HTML');
             return;
         }
-        $rates = requireTronRates(['TRX', 'USD']);
+        $rates = rate_arze();
         if ($rates === null) {
             sendmessage($from_id, $textbotlang['users']['Balance']['errorLinkPayment'], $keyboard, 'HTML');
             step('home', $from_id);
@@ -5796,7 +5796,7 @@ $textonebuy
         step("getvoocherx", $from_id);
         savedata("clear", "id_payment", $randomString);
     } elseif ($datain == "digitaltron") {
-        $rates = requireTronRates(['TRX', 'USD']);
+        $rates = rate_arze();
         if ($rates === null) {
             sendmessage($from_id, $textbotlang['users']['Balance']['errorLinkPayment'], $keyboard, 'HTML');
             step('home', $from_id);
@@ -5868,7 +5868,7 @@ $textonebuy
         $message_id =sendmessage($from_id, $textnowpayments, $paymentkeyboard, 'HTML');
         updatePaymentMessageId($message_id, $randomString);
     } elseif ($datain == "startelegrams") {
-        $rates = requireTronRates(['USD', 'Ton']);
+        $rates = rate_arze(['USD', 'Ton']);
         if ($rates === null) {
             sendmessage($from_id, $textbotlang['users']['Balance']['errorLinkPayment'], $keyboard, 'HTML');
             step('home', $from_id);
@@ -7033,7 +7033,7 @@ $text_porsant
     $stmt->bindParam(':price', $pricelast);
     $stmt->execute();
 } elseif ($text == "/tron") {
-    $rates = requireTronRates(['TRX']);
+    $rates = rate_arze(['TRX']);
     if ($rates === null) {
         sendmessage($from_id, "❌ دریافت قیمت در حال حاضر امکان پذیر نیست. لطفاً بعداً تلاش کنید.", null, 'HTML');
         return;
@@ -7041,7 +7041,7 @@ $text_porsant
     $price = $rates['TRX'];
     sendmessage($from_id, sprintf($textbotlang['users']['pricearze']['tron-price'], $price), null, 'HTML');
 } elseif ($text == "/usd") {
-    $rates = requireTronRates(['USD']);
+    $rates = rate_arze(['USD']);
     if ($rates === null) {
         sendmessage($from_id, "❌ دریافت قیمت در حال حاضر امکان پذیر نیست. لطفاً بعداً تلاش کنید.", null, 'HTML');
         return;

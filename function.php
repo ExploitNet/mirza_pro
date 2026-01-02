@@ -394,8 +394,8 @@ function update($table, $field, $newValue, $whereField = null, $whereValue = nul
 function &getSelectCacheStore()
 {
     static $store = [
-        'results' => [],
-        'tableIndex' => [],
+    'results' => [],
+    'tableIndex' => [],
     ];
 
     return $store;
@@ -521,90 +521,16 @@ function generateUUID()
 
     return $uuid;
 }
-function tronratee()
+function rate_arze()
 {
-    $context = stream_context_create([
-        'http' => [
-            'timeout' => 5,
-        ],
-    ]);
+    $arze_rate = [];
+    $requests_tron = json_decode(file_get_contents('https://api.diadata.org/v1/assetQuotation/Tron/0x0000000000000000000000000000000000000000'), true);
+    $requestsusd = json_decode(file_get_contents('https://api.wallex.ir/v1/markets'), true);
+    $arze_rate['USD'] = intval($requestsusd['result']['symbols']['USDTTMN']['stats']['lastPrice']);
+    $arze_rate['TRX'] = intval($requests_tron['Price'] * $arze_rate['USD']);
 
-    $url = 'https://bapi.officialvpn.shop/arz/mirza_arz.php';
-    $response = @file_get_contents($url, false, $context);
-
-    if ($response === false) {
-        error_log('Failed to fetch currency rates from CoinGecko');
-        return ['ok' => false, 'result' => []];
-    }
-
-    $data = json_decode($response, true);
-    if (!is_array($data)) {
-        error_log('Invalid response received from CoinGecko');
-        return ['ok' => false, 'result' => []];
-    }
-
-    $extractRate = static function (?array $assetData, string $symbol) {
-        if (!is_array($assetData) || empty($assetData)) {
-            error_log('Missing or invalid rate for ' . $symbol . ' from CoinGecko');
-            return null;
-        }
-
-        $irr = $assetData['irr'] ?? null;
-        if (is_numeric($irr) && (float)$irr > 0.0) {
-            return (float)$irr;
-        }
-
-        $irt = $assetData['irt'] ?? null;
-        if (is_numeric($irt) && (float)$irt > 0.0) {
-            return (float)$irt * 10.0;
-        }
-
-        error_log('Missing or invalid rate for ' . $symbol . ' from CoinGecko');
-        return null;
-    };
-
-    $requiredRates = [
-        'TRX' => $extractRate($data['tron'] ?? null, 'TRX'),
-        'Ton' => $extractRate($data['toncoin'] ?? null, 'Ton'),
-        'USD' => $extractRate($data['tether'] ?? null, 'USD'),
-    ];
-
-    foreach ($requiredRates as $value) {
-        if ($value === null) {
-            return ['ok' => false, 'result' => []];
-        }
-    }
-
-    $toToman = static function ($rialValue) {
-        return round($rialValue / 10, 2);
-    };
-
-    $result = [
-        'TRX' => $toToman($requiredRates['TRX']),
-        'Ton' => $toToman($requiredRates['Ton']),
-        'USD' => $toToman($requiredRates['USD']),
-    ];
-
-    return ['ok' => true, 'result' => $result];
+    return $arze_rate;
 }
-
-function requireTronRates(array $keys = [])
-{
-    $rates = tronratee();
-    if (empty($rates['ok'])) {
-        return null;
-    }
-
-    $result = $rates['result'];
-    foreach ($keys as $key) {
-        if (!isset($result[$key]) || (is_numeric($result[$key]) && (float)$result[$key] == 0.0)) {
-            return null;
-        }
-    }
-
-    return $result;
-}
-
 function updatePaymentMessageId($response, $orderId)
 {
     if (!is_array($response)) {
@@ -2054,7 +1980,7 @@ function sendMessageService($panel_info, $config, $sub_link, $username_service, 
     }
     if ($STATUS_SEND_MESSAGE_PHOTO) {
         if ($panel_info['type'] == "WGDashboard") {
-            $urlimage = "{$panel_info['inboundid']}_{$username_service}.conf";
+            $urlimage = "{$panel_info['inboundid']}_{$invoice_id}.conf";
             file_put_contents($urlimage, $sub_link);
             telegram('senddocument', [
                 'chat_id' => $user_id,
